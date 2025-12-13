@@ -381,94 +381,95 @@ class QuadrupedRobot:
 
     def turn_left(self):
         """
-        좌회전 (순서: 3->2->1->4)
+        좌회전 - Trot Pattern (Optimized)
+        Diagonal pairs: (2,4) and (1,3)
         """
-        print("--- Turning Left ---")
-        power_duration = 0.2
+        print("--- Turning Left (Trot) ---")
+        param_speed = 0.15 # Fast turn
 
-        # 각 다리를 순차적으로 이동
+        # 1. Lift Pair 2 (2,4) while Pair 1 (1,3) pulls to Neutral
+        # Assuming Pair 1 is already near Neutral or will slide there
         if not self._move_legs_interpolated(
             {
-                1: Poses.TURN_LEFT_POS_4,
                 2: Poses.LEFT_INTERM_POS,
-                3: Poses.TURN_LEFT_POS_4,
-                4: Poses.LEFT_INTERM_POS,                
-            }, power_duration
-        ):
-            return
-        
+                4: Poses.LEFT_INTERM_POS,
+                1: Poses.TURN_LEFT_POS_4, # Pull/Hold Neutral
+                3: Poses.TURN_LEFT_POS_4
+            }, param_speed
+        ): return
+
+        # 2. Place Pair 2 (2,4) at Turn Step
         if not self._move_legs_interpolated(
             {
                 2: Poses.TURN_LEFT_POS_1,
                 4: Poses.TURN_LEFT_POS_1
-            }, power_duration
-        ):
-            return
-        
+            }, param_speed
+        ): return
+
+        # 3. Lift Pair 1 (1,3) while Pair 2 (2,4) pulls to Neutral (Generating Turn Torque)
         if not self._move_legs_interpolated(
             {
                 1: Poses.LEFT_INTERM_POS,
-                2: Poses.TURN_LEFT_POS_4,
-                3: Poses.LEFT_INTERM_POS,                
+                3: Poses.LEFT_INTERM_POS,
+                2: Poses.TURN_LEFT_POS_4, # Pull Back to Neutral creates turn
                 4: Poses.TURN_LEFT_POS_4
-            }, power_duration
-        ):
-            return
+            }, param_speed
+        ): return
 
+        # 4. Place Pair 1 (1,3) at Turn Step
         if not self._move_legs_interpolated(
             {
                 1: Poses.TURN_LEFT_POS_1,
                 3: Poses.TURN_LEFT_POS_1
-            }, power_duration
-        ):
-            return
+            }, param_speed
+        ): return
 
         print("--- Turn Left Finished ---")
 
     def turn_right(self):
         """
-        우회전 (순서: 3->2->1->4)
+        우회전 - Trot Pattern (Optimized)
+        Diagonal pairs: (2,4) and (1,3)
         """
-        print("--- Turning Right ---")
-        power_duration = 0.2
+        print("--- Turning Right (Trot) ---")
+        param_speed = 0.15
 
-        # 각 다리를 순차적으로 이동
+        # 1. Lift Pair 2 (2,4)
         if not self._move_legs_interpolated(
             {
-                1: Poses.RIGHT_INTERM_POS,
-                2: Poses.TURN_RIGHT_POS_4,
-                3: Poses.RIGHT_INTERM_POS,                
-                4: Poses.TURN_RIGHT_POS_4
-            }, power_duration
-        ):
-            return
-
-        if not self._move_legs_interpolated(
-            {
-                1: Poses.TURN_RIGHT_POS_5,
-                3: Poses.TURN_RIGHT_POS_5
-            }, power_duration
-        ):
-            return
-        
-        if not self._move_legs_interpolated(
-            {
-                1: Poses.TURN_RIGHT_POS_4,
                 2: Poses.RIGHT_INTERM_POS,
-                3: Poses.TURN_RIGHT_POS_4,
-                4: Poses.RIGHT_INTERM_POS,                
-            }, power_duration
-        ):
-            return
-        
+                4: Poses.RIGHT_INTERM_POS,
+                1: Poses.TURN_RIGHT_POS_4, # Neutral
+                3: Poses.TURN_RIGHT_POS_4
+            }, param_speed
+        ): return
+
+        # 2. Place Pair 2 (2,4) at Turn Step
+        # Using POS_5 (1895...) which seems to be the turn step for right
         if not self._move_legs_interpolated(
             {
                 2: Poses.TURN_RIGHT_POS_5,
                 4: Poses.TURN_RIGHT_POS_5
-            }, power_duration
-        ):
-            return
+            }, param_speed
+        ): return
 
+        # 3. Lift Pair 1 (1,3) while Pair 2 Pulls
+        if not self._move_legs_interpolated(
+            {
+                1: Poses.RIGHT_INTERM_POS,
+                3: Poses.RIGHT_INTERM_POS,
+                2: Poses.TURN_RIGHT_POS_4, # Pull to Neutral
+                4: Poses.TURN_RIGHT_POS_4
+            }, param_speed
+        ): return
+
+        # 4. Place Pair 1 (1,3)
+        if not self._move_legs_interpolated(
+            {
+                1: Poses.TURN_RIGHT_POS_5,
+                3: Poses.TURN_RIGHT_POS_5
+            }, param_speed
+        ): return
 
         print("--- Turn Right Finished ---")
 # --- 메인 실행 ---

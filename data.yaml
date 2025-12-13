@@ -1,0 +1,8 @@
+names:
+- AI
+- AWEAR
+- IMR
+nc: 3
+path: /SSDe/sangmin_park/robotics/data/data_merged_final
+train: images/train
+val: images/val

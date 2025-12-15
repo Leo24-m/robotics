@@ -164,21 +164,21 @@ class Poses:
     WALK_LEFT_BACK_2 = Position(1677, 2432, 1409)  # 다리2 = forward의 다리3 backward
     
     # Walk Right Positions (오른쪽 다리 1,2를 앞다리로 취급)
-    # move_forward 매핑: 1→1, 4→2, 2→4, 3→3
+    # move_forward 매핑: forward의 4→1, 3→2, 1→4, 2→3 (반시계 회전)
     WALK_RIGHT_INTERM_A = Position(2086, 1681, 2202)  # 다리 1,2 들기용
     WALK_RIGHT_INTERM_B = Position(2009, 1681, 2202)  # 다리 4,3 들기용
     
     # Power stroke positions (forward에서 회전)
-    WALK_RIGHT_POS_1 = Position(1677, 2432, 1409)  # 다리1 = forward의 다리1
-    WALK_RIGHT_POS_2 = Position(1754, 2057, 2413)  # 다리2 = forward의 다리4
-    WALK_RIGHT_POS_4 = Position(2418, 2432, 1409)  # 다리4 = forward의 다리2
-    WALK_RIGHT_POS_3 = Position(2341, 2057, 2413)  # 다리3 = forward의 다리3
+    WALK_RIGHT_POS_1 = Position(1754, 2057, 2413)  # 다리1 = forward의 다리4
+    WALK_RIGHT_POS_2 = Position(2341, 2057, 2413)  # 다리2 = forward의 다리3
+    WALK_RIGHT_POS_4 = Position(1677, 2432, 1409)  # 다리4 = forward의 다리1
+    WALK_RIGHT_POS_3 = Position(2418, 2432, 1409)  # 다리3 = forward의 다리2
     
     # Return stroke positions (forward에서 회전)
-    WALK_RIGHT_BACK_1 = Position(2341, 2057, 2413)  # 다리1 = forward의 다리1 backward
-    WALK_RIGHT_BACK_2 = Position(2418, 2432, 1409)  # 다리2 = forward의 다리4 backward
-    WALK_RIGHT_BACK_4 = Position(1754, 2057, 2413)  # 다리4 = forward의 다리2 backward
-    WALK_RIGHT_BACK_3 = Position(1677, 2432, 1409)  # 다리3 = forward의 다리3 backward
+    WALK_RIGHT_BACK_1 = Position(2418, 2432, 1409)  # 다리1 = forward의 다리4 backward
+    WALK_RIGHT_BACK_2 = Position(1677, 2432, 1409)  # 다리2 = forward의 다리3 backward
+    WALK_RIGHT_BACK_4 = Position(2341, 2057, 2413)  # 다리4 = forward의 다리1 backward
+    WALK_RIGHT_BACK_3 = Position(1754, 2057, 2413)  # 다리3 = forward의 다리2 backward
 
 
 @dataclass
@@ -391,42 +391,42 @@ class GaitPatterns:
                       3(BL)---2(BR)  (뒤)
         
         오른쪽 이동 시: 1,2(앞) --- 4,3(뒤)
-        move_forward의 Trot 패턴 유지 (대각선으로 들기)
+        move_forward를 반시계 회전: 4→1, 3→2, 1→4, 2→3
         
         forward: 2,4 들기 / 1,3 들기
-        right:   3,4 들기 / 1,2 들기  (변환)
+        right:   2,4 들기 / 1,3 들기 (동일!)
         """
         return [
-            # Step 1: 다리 3,4 들기 (대각선 - forward의 2,4에 해당)
+            # Step 1: 다리 2,4 들기 (대각선 - forward와 동일)
             GaitStep(
                 movements={
-                    3: Poses.WALK_RIGHT_INTERM_A,  # Back-Left
-                    4: Poses.WALK_RIGHT_INTERM_A,  # Front-Left
+                    2: Poses.WALK_RIGHT_INTERM_A,  # Back-Right (앞다리)
+                    4: Poses.WALK_RIGHT_INTERM_A,  # Front-Left (뒷다리)
                 },
                 duration_type='return',
-                description="Lift legs 3,4 (diagonal pair)"
+                description="Lift legs 2,4 (diagonal pair)"
             ),
             
             # Step 2: Power stroke
             GaitStep(
                 movements={
-                    1: Poses.WALK_RIGHT_POS_1,  # 다리1 (forward의 다리1 역할)
-                    2: Poses.WALK_RIGHT_POS_2,  # 다리2 (forward의 다리4 역할)
-                    4: Poses.WALK_RIGHT_POS_4,  # 다리4 (forward의 다리2 역할)
-                    3: Poses.WALK_RIGHT_POS_3,  # 다리3 (forward의 다리3 역할)
+                    1: Poses.WALK_RIGHT_POS_1,  # 다리1 = forward의 다리4 역할
+                    2: Poses.WALK_RIGHT_POS_2,  # 다리2 = forward의 다리3 역할
+                    4: Poses.WALK_RIGHT_POS_4,  # 다리4 = forward의 다리1 역할
+                    3: Poses.WALK_RIGHT_POS_3,  # 다리3 = forward의 다리2 역할
                 },
                 duration_type='power',
                 description="Power stroke - all legs push right"
             ),
             
-            # Step 3: 다리 1,2 들기 (대각선 - forward의 1,3에 해당)
+            # Step 3: 다리 1,3 들기 (대각선 - forward와 동일)
             GaitStep(
                 movements={
-                    1: Poses.WALK_RIGHT_INTERM_B,  # Front-Right
-                    2: Poses.WALK_RIGHT_INTERM_B,  # Back-Right
+                    1: Poses.WALK_RIGHT_INTERM_B,  # Front-Right (앞다리)
+                    3: Poses.WALK_RIGHT_INTERM_B,  # Back-Left (뒷다리)
                 },
                 duration_type='return',
-                description="Lift legs 1,2 (diagonal pair)"
+                description="Lift legs 1,3 (diagonal pair)"
             ),
             
             # Step 4: Return stroke

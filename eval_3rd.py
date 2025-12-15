@@ -10,6 +10,7 @@ import sys
 import numpy as np
 import pyrealsense2 as rs
 import cv2
+import threading
 from ultralytics import YOLO
 
 # Import robot control
@@ -24,8 +25,13 @@ MARKER_DICT_TYPE = cv2.aruco.DICT_5X5_100
 YOLO_MODEL_PATH = "yolov8n.pt"
 
 # ArUco Config
+# ArUco Config
+# ArUco Config
 CENTER_THRESHOLD = 80      # Pixel threshold for centering
-TARGET_DISTANCE = 0.40     # Distance to stop approaching and execute turn/switch
+FOV_MARGIN = 160           # Only detect markers within +/- this pixels from center x
+TARGET_DISTANCE = 0.30     # Distance to stop approaching and execute turn/switch
+BURST_REPEAT = 3           # Number of times to repeat action commands
+BURST_FORWARD_DIST = 0.45  # Distance threshold to trigger burst forward
 MIN_DISTANCE = 0.20        # Minimum safety distance
 MAX_DISTANCE = 3.0         # Ignored if further
 
@@ -61,13 +67,35 @@ class HybridTracker:
         self.aruco_params = cv2.aruco.DetectorParameters()
         
         # YOLO Setup
-        print(f"Loading YOLO model: {YOLO_MODEL_PATH}...")
-        self.model = YOLO(YOLO_MODEL_PATH)
+        self.model = None
+        self.model_ready = False
+        # Start async loading
+        threading.Thread(target=self._load_model, daemon=True).start()
+
         
         # Timing
         self.last_frame_time = None
         self.current_fps = 0.0
         self.last_infer_ms = 0.0
+
+        # Navigation State
+        self.nav_state = 'SEARCHING' # SEARCHING, APPROACHING, TURNING, MOVING_AFTER_TURN
+        self.current_marker_id = None
+        self.state_timer = 0
+        self.turn_duration = 2.0  # Seconds to allow for turn
+        self.move_after_turn_duration = 2.0 # Seconds to move forward after turn
+
+
+    def _load_model(self):
+        print(f"Loading YOLO model: {YOLO_MODEL_PATH} (Async)...")
+        try:
+            self.model = YOLO(YOLO_MODEL_PATH)
+            # Force CUDA if available, though ultralytics usually auto-detects
+            # self.model.to('cuda') 
+            print("YOLO model loaded successfully.")
+            self.model_ready = True
+        except Exception as e:
+            print(f"Error loading YOLO model: {e}")
 
     def start(self):
         try:
@@ -187,21 +215,98 @@ class HybridTracker:
             detections = self.detect_aruco(color_image, depth_frame)
             all_detections = detections
             
+            # Helper: FOV Filter
+            def is_in_fov(d):
+                cx = d['center'][0]
+                return abs(cx - self.frame_width // 2) < FOV_MARGIN
+
+            # State Machine for Navigation
+            current_time = time.time()
+            
             # 1. Check for Trigger Marker 9
-            marker_9 = next((d for d in detections if d['id'] == 9), None)
+            marker_9 = next((d for d in detections if d['id'] == 9 and is_in_fov(d)), None)
             
+            # If we see Marker 9 and are close strictly switch
             if marker_9 and marker_9['distance'] and marker_9['distance'] < TARGET_DISTANCE:
-                # Trigger Switch!
+                 # Trigger Switch!
                 print(f">>> MARKER 9 DETECTED ({marker_9['distance']:.2f}m). SWITCHING TO YOLO MODE. TARGET: {self.target_class} <<<")
+                
+                if not self.model_ready:
+                    print(">>> WARNING: YOLO Model not ready yet! Waiting... <<<")
+                    # Option: Busy wait or just fail safely? 
+                    # Let's just return stop and retry next frame
+                    return color_image, None, detections, 'stop'
+
                 self.mode = 'YOLO'
+                self.nav_state = 'TRACKING'
                 return color_image, None, detections, 'stop' # Stop briefly
+
+            # 2. Navigation Logic
+            if self.nav_state == 'SEARCHING':
+                # Strategy: Rotate Left until Marker 1 or 2 is found (or any valid 1-8)
+                # Filter out 9, check distance based on MAX, AND CHECK FOV
+                valid_markers = [d for d in detections if d['id'] != 9 and d['distance'] is not None and d['distance'] < MAX_DISTANCE and is_in_fov(d)]
+                
+                if valid_markers:
+                    # Found a marker!
+                    target = min(valid_markers, key=lambda d: d['distance'])
+                    self.current_marker_id = target['id']
+                    self.nav_state = 'APPROACHING'
+                    print(f">>> FOUND MARKER {self.current_marker_id}. APPROACHING. <<<")
+                    command = self.get_aruco_command(target)
+                else:
+                    # No marker, keep rotating left
+                    command = 'left' 
             
-            # 2. Select Marker Target (Closest 1-8)
-            # Filter out 9 if it's far, since we only care if close
-            valid_markers = [d for d in detections if d['id'] != 9 and d['distance'] is not None and d['distance'] < MAX_DISTANCE]
-            if valid_markers:
-                target = min(valid_markers, key=lambda d: d['distance'])
-                command = self.get_aruco_command(target)
+            elif self.nav_state == 'APPROACHING':
+                 # Look for our cached marker id
+                 target = next((d for d in detections if d['id'] == self.current_marker_id), None)
+                 
+                 if target:
+                     command = self.get_aruco_command(target)
+                     if command.startswith('action_turn'):
+                         # We reached the distance. Transition to turning
+                         self.nav_state = 'TURNING'
+                         self.state_timer = current_time
+                         print(f">>> REACHED MARKER {self.current_marker_id}. TURNING. ({command}) <<<")
+                 else:
+                     # Lost marker? Go back to search? 
+                     # Or maybe wait a bit? For now, strict reset.
+                     print(">>> LOST MARKER DURING APPROACH. SEARCHING. <<<")
+                     self.nav_state = 'SEARCHING'
+                     command = 'stop'
+
+            elif self.nav_state == 'TURNING':
+                # Execute turn for fixed duration? 
+                # OR just send the command once? 
+                # The command structure sends 'action_turn_left/right' which robot_ctrl executes.
+                # But we need to ensure we don't spam it, or we wait for it.
+                
+                # Logic: We determine turn direction based on ID.
+                if self.current_marker_id % 2 != 0:
+                    command = 'action_turn_left'
+                else:
+                    command = 'action_turn_right'
+                    
+                # We stay in this state for a bit? 
+                # Actually, usually 'action_turn' is a discrete move. 
+                # Let's assume we send it, then switch to MOVING_AFTER_TURN immediately?
+                # But we only want to send it ONCE? robot_ctrl has cooldown.
+                
+                # Let's switch state immediately to wait/move
+                self.nav_state = 'MOVING_AFTER_TURN'
+                self.state_timer = current_time
+                
+            elif self.nav_state == 'MOVING_AFTER_TURN':
+                # Move forward blindly for X seconds
+                if current_time - self.state_timer < self.move_after_turn_duration:
+                    command = 'forward'
+                else:
+                    # Done moving, back to search
+                    print(">>> MOVE COMPLETE. RESUMING SEARCH. <<<")
+                    self.nav_state = 'SEARCHING'
+                    self.current_marker_id = None
+                    command = 'stop' # Brief stop before search loop
                 
         elif self.mode == 'YOLO':
             # --- YOLO MODE ---
@@ -231,6 +336,8 @@ class HybridTracker:
             
         # Distance/Action
         if dist > TARGET_DISTANCE:
+            if dist > BURST_FORWARD_DIST:
+                return 'forward_burst'
             return 'forward'
         else:
             # Action!
@@ -249,8 +356,10 @@ class HybridTracker:
             return 'left' if offset < 0 else 'right'
             
         # Approach
-        if dist > TARGET_DISTANCE: # Stop at same distance? Or get closer? YOLO usually follows.
-            return 'forward'
+        if dist > TARGET_DISTANCE: 
+             if dist > BURST_FORWARD_DIST:
+                 return 'forward_burst'
+             return 'forward'
         else:
             return 'stop' # Reached target
 
@@ -276,16 +385,25 @@ class RobotControllerWrapper:
 
         if command == 'forward':
             self.robot.move_forward(fast=True)
+        elif command == 'forward_burst':
+            print(f">>> BURST FORWARD ({BURST_REPEAT}x) <<<")
+            for _ in range(BURST_REPEAT):
+                self.robot.move_forward(fast=True)
+                time.sleep(0.1)
         elif command == 'left':
             self.robot.turn_left()
         elif command == 'right':
             self.robot.turn_right()
         elif command == 'action_turn_left':
-            print(">>> ODD MARKER -> LEFT <<<")
-            self.robot.turn_left()
+            print(f">>> ODD MARKER -> LEFT BURST ({BURST_REPEAT}x) <<<")
+            for _ in range(BURST_REPEAT):
+                self.robot.turn_left()
+                time.sleep(0.1)
         elif command == 'action_turn_right':
-            print(">>> EVEN MARKER -> RIGHT <<<")
-            self.robot.turn_right()
+            print(f">>> EVEN MARKER -> RIGHT BURST ({BURST_REPEAT}x) <<<")
+            for _ in range(BURST_REPEAT):
+                self.robot.turn_right()
+                time.sleep(0.1)
         elif command == 'stop':
              pass # Standby
 
@@ -303,6 +421,10 @@ def visualize(frame, target, detections, command, fps, mode, target_class):
     cv2.line(disp, (cx, 0), (cx, h), (255,255,255), 1)
     cv2.line(disp, (cx-CENTER_THRESHOLD, 0), (cx-CENTER_THRESHOLD, h), (0,255,0), 1)
     cv2.line(disp, (cx+CENTER_THRESHOLD, 0), (cx+CENTER_THRESHOLD, h), (0,255,0), 1)
+    
+    # FOV Guides (Blue)
+    cv2.line(disp, (cx-FOV_MARGIN, 0), (cx-FOV_MARGIN, h), (255,0,0), 1)
+    cv2.line(disp, (cx+FOV_MARGIN, 0), (cx+FOV_MARGIN, h), (255,0,0), 1)
     
     for d in detections:
         dist = d.get('distance')
@@ -324,6 +446,8 @@ def visualize(frame, target, detections, command, fps, mode, target_class):
     # Mode Indicator
     mode_color = (0, 255, 255) if mode == 'ARUCO' else (255, 0, 255)
     cv2.putText(disp, f"MODE: {mode}", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.8, mode_color, 2)
+    # Optional: Display Nav State
+    # cv2.putText(disp, f"STATE: {getattr(tracker, 'nav_state', '')}", (200, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (200,200,200), 1)
     
     cv2.putText(disp, f"CMD: {command.upper()}", (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
     if mode == 'YOLO':

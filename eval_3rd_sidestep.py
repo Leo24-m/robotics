@@ -33,8 +33,8 @@ MARKER_LENGTH = 0.0268       # meters
 YOLO_MODEL_PATH = "yolov8n.pt"
 
 # Navigation Params
-FOV_MARGIN = 160           # Center locking margin
-CENTER_THRESHOLD = 80      # Forward alignment
+FOV_MARGIN = 320           # Center locking margin
+CENTER_THRESHOLD = 160      # Forward alignment
 APPROACH_STOP_DIST = 0.60  # Stop ArUco approach at 60cm
 M9_CHECK_DIST = 1.00       # Distance to stop and center for M9 (approx 1m)
 TURN_WAIT_TIME = 2.0       
@@ -262,8 +262,8 @@ class HybridEvaluator:
         # --- STATE MACHINE ---
         
         if self.state == 'SEARCHING':
-            # 1. Check for M9 override
-            m9 = next((d for d in aruco_dets if d['id'] == 9), None)
+            # 1. Check for M9 override (only if close enough - < 2.0m)
+            m9 = next((d for d in aruco_dets if d['id'] == 9 and d['distance'] < 2.0), None)
             if m9:
                  self.buffered_id = 9
                  self.state = 'M9_CENTERING'
@@ -275,7 +275,7 @@ class HybridEvaluator:
             for d in aruco_dets:
                 mid = d['id']
                 if mid == 9: continue
-                if d['distance'] > 3.0: continue 
+                if d['distance'] > 2.0: continue  # Ignore markers beyond 2m 
 
                 if not self.initial_scan_done:
                     if mid in [1, 2]: valid_candidates.append(d)
@@ -296,8 +296,8 @@ class HybridEvaluator:
             # Find Buffered ID
             target = next((d for d in aruco_dets if d['id'] == self.buffered_id), None)
             
-            # M9 Check
-            m9 = next((d for d in aruco_dets if d['id'] == 9), None)
+            # M9 Check (only if close enough - < 2.0m)
+            m9 = next((d for d in aruco_dets if d['id'] == 9 and d['distance'] < 2.0), None)
             if m9:
                  self.buffered_id = 9
                  self.state = 'M9_CENTERING'
@@ -359,7 +359,7 @@ class HybridEvaluator:
             
             if new_candidates:
                 target = min(new_candidates, key=lambda x: x['distance'])
-                if target['distance'] < 3.0:
+                if target['distance'] < 2.0:  # Changed from 3.0 to 2.0
                     self.buffered_id = target['id']
                     self.state = 'APPROACHING'
                     print(f"[STATE] Found NEW ID {self.buffered_id}. APPROACHING.")

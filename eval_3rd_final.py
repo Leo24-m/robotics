@@ -38,7 +38,7 @@ MARKER_DICT_TYPE = cv2.aruco.DICT_4X4_100  # As per previous script, or 4x4? Use
 # Actually, let's stick to eval_3rd_modi's 6x6 which was working.
 MARKER_DICT_TYPE = cv2.aruco.DICT_4X4_100 
 MARKER_LENGTH = 0.0268       # meters (마커 한 변 실제 길이)
-GOAL_FORWARD_M = 0.18        # 마커 평면 기준 +Z로 18cm (여기만 바꾸면 됨)
+GOAL_FORWARD_M = 0.30        # 마커 평면 기준 +Z로 18cm (여기만 바꾸면 됨)
 YOLO_MODEL_PATH = "yolov8n.pt"
 
 # Navigation Params
@@ -47,9 +47,6 @@ CENTER_THRESHOLD = 80      # Forward alignment
 APPROACH_STOP_DIST = 0.30  # Stop ArUco approach at 30cm
 M9_CHECK_DIST = 1.20       # Stop at 1.2m for YOLO check
 TURN_WAIT_TIME = 2.0       # Wait after turn
-
-# Goal Calculation Params (from check_aruco_2)
-GOAL_FORWARD_M = 0.18      # Doesn't matter much for robot logic, used for debug text
 
 # YOLO Target Mapping
 TARGET_CLASS_MAP = {
@@ -72,7 +69,7 @@ def get_distance_at_point(depth_frame, x, y, radius=3, max_dist=10.0):
                 vals.append(d)
     return float(np.median(vals)) if vals else None
 
-def compute_goal_from_marker_using_depth_rvec(rvec, tvec_depth, d_forward=0.18):
+def compute_goal_from_marker_using_depth_rvec(rvec, tvec_depth, d_forward=0.30):
     rvec = rvec.reshape(3, 1).astype(np.float32)
     tvec_depth = tvec_depth.reshape(3, 1).astype(np.float32)
     R, _ = cv2.Rodrigues(rvec)
@@ -120,120 +117,11 @@ class HybridEvaluator:
         self.state = 'SEARCHING' # SEARCHING, APPROACHING, ACTION, M9_APPROACH, M9_CHECK, FINAL_APPROACH
         self.buffered_id = None  # ID of the marker we are currently locked onto
         self.state_timer = 0.0
-        self.action_counter = 0
-
-        # Performance
-        self.last_frame_time = time.time()
-        self.fps = 0.0
-
-    def _load_yolo(self):
-        print(">>> YOLO Loading (Async)...")
-        try:
-            self.model = YOLO(YOLO_MODEL_PATH)
-            self.model_ready = True
-            print(">>> YOLO Loaded.")
-        except Exception as e:
-            print(f"!!! YOLO Load Failed: {e}")
-
-    def start(self):
-        profile = self.pipeline.start(self.config)
-        color_stream = profile.get_stream(rs.stream.color)
-        
-        # Store actual intrinsics object for rs2_deproject_pixel_to_point
-        self.intrinsics = color_stream.as_video_stream_profile().get_intrinsics()
-        
-        # Matrix form for OpenCV
-        self.camera_matrix = np.array([[self.intrinsics.fx, 0, self.intrinsics.ppx], 
-                                       [0, self.intrinsics.fy, self.intrinsics.ppy], 
-                                       [0, 0, 1]], dtype=float)
-        self.dist_coeffs = np.array(self.intrinsics.coeffs)
-        return True
-
-    def stop(self):
-        self.pipeline.stop()
-
-    def get_frame(self):
-        frames = self.pipeline.wait_for_frames()
-        aligned_frames = self.align.process(frames)
-        color_frame = aligned_frames.get_color_frame()
-        depth_frame = aligned_frames.get_depth_frame()
-        
-        now = time.time()
-        dt = now - self.last_frame_time
-        if dt > 0: self.fps = 1.0/dt
-        self.last_frame_time = now
-        
-        return color_frame, depth_frame
-
-    def detect_aruco(self, img, depth_frame):
-        # 1. Detect
-        corners, ids, _ = self.detector.detectMarkers(img)
-        detections = []
-        if ids is not None:
-            # 2. Estimate Pose
-            rvecs, tvecs, _ = cv2.aruco.estimatePoseSingleMarkers(
-                corners, MARKER_LENGTH, self.camera_matrix, self.dist_coeffs
-            )
-            ids = ids.flatten()
-            for i, mid in enumerate(ids):
-                # Basic Info
-                c = corners[i][0]
-                cx, cy = int(np.mean(c[:, 0])), int(np.mean(c[:, 1]))
-                
-                rv = rvecs[i].reshape(3,1)
-                tv = tvecs[i].reshape(3,1)
-                
-                # Robust Distance (Depth + Pose Fusion)
-                dist_depth = get_distance_at_point(depth_frame, cx, cy)
-                
-                # Compute Goal/Position using check_aruco_2 logic
-                if dist_depth:
-                    # Deproject using REAL intrinsics object
-                    p = rs.rs2_deproject_pixel_to_point(
-                        self.intrinsics, [float(cx), float(cy)], float(dist_depth)
-                    )
-                    tvec_final = np.array([[p[0]], [p[1]], [p[2]]], dtype=np.float32)
-                    dist_src = "depth"
-                else:
-                    tvec_final = tv
-                    dist_src = "pose" # fallback
-
-                # Distances
-                dist_3d = float(np.linalg.norm(tvec_final))
-                
-                detections.append({
-                    'type': 'aruco',
-                    'id': int(mid),
-                    'corners': c,
-                    'center': (cx, cy),
-                    'distance': dist_3d,
-                    'rvec': rv,
-                    'tvec': tvec_final,
-                    'dist_src': dist_src
-                })
-        return detections
-
-    def detect_yolo(self, img):
-        if not self.model_ready: return []
-        results = self.model(img, conf=0.5, verbose=False)
-        detections = []
-        for result in results:
-            for box in result.boxes:
-                cls_id = int(box.cls[0])
-                cls_name = self.model.names[cls_id]
-                x1,y1,x2,y2 = map(int, box.xyxy[0])
-                cx, cy = (x1+x2)//2, (y1+y2)//2
-                detections.append({
-                    'type': 'yolo',
-                    'class': cls_name,
-                    'center': (cx, cy),
-                    'bbox': (x1,y1,x2,y2)
-                })
-        return detections
+        self.initial_scan_done = False # [NEW] flag
 
     def process(self):
         c_frame, d_frame = self.get_frame()
-        if not c_frame: return None, None, 'none'
+        if not c_frame: return None, None, 'none', self.state, None
         
         img = np.asanyarray(c_frame.get_data())
         
@@ -253,14 +141,43 @@ class HybridEvaluator:
         # --- STATE MACHINE ---
         
         if self.state == 'SEARCHING':
-            # Goal: Rotate Left until Marker 1 or 2 is in view
-            # 1. Check if we see 1 or 2
-            valid = [d for d in aruco_dets if d['id'] in [1, 2]]
-            if valid:
+            # Check for M9 (Override Trigger)
+            m9 = next((d for d in aruco_dets if d['id'] == 9), None)
+            if m9:
+                 self.buffered_id = 9
+                 self.state = 'M9_APPROACH'
+                 print(f"[STATE] Found ID 9 during SEARCH! Switching to M9_APPROACH.")
+                 return img, all_dets, 'stop', self.state, m9
+
+            # Logic:
+            # - If initial_scan_done is False: Look for [1, 2]
+            # - If True: Look for ANY valid marker (except 9)
+            
+            valid_candidates = []
+            for d in aruco_dets:
+                mid = d['id']
+                dist = d['distance']
+                
+                # Skip 9 (handled above)
+                if mid == 9: continue
+                # Skip too far/invalid
+                if dist > 3.0: continue 
+
+                if not self.initial_scan_done:
+                    if mid in [1, 2]:
+                        valid_candidates.append(d)
+                else:
+                    # Search for any valid logic marker
+                    # Optional: Avoid re-locking same ID immediately?
+                    # For now, just find closest
+                    valid_candidates.append(d)
+
+            if valid_candidates:
                 # Found! Lock on strongest
-                target = min(valid, key=lambda x: x['distance'])
+                target = min(valid_candidates, key=lambda x: x['distance'])
                 self.buffered_id = target['id']
                 self.state = 'APPROACHING'
+                self.initial_scan_done = True # Mark as done once we lock on first time
                 print(f"[STATE] Found ID {self.buffered_id}. APPROACHING.")
                 command = 'stop' # simple pause
             else:

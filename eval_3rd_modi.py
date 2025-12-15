@@ -17,13 +17,15 @@ from ultralytics import YOLO
 try:
     from eval_2nd_modi import DynamixelController, QuadrupedRobot, LEG_IDS, DEVICENAME, BAUDRATE
 except ImportError:
-    print("Error: eval_2nd_modi.py not found. Robot control will be simulated/disabled.")
-    # sys.exit(1)
+    print("Error: eval_2nd_modi.py not found.")
+    sys.exit(1)
 
 # --- Configuration ---
-MARKER_DICT_TYPE = cv2.aruco.DICT_6X6_100
+MARKER_DICT_TYPE = cv2.aruco.DICT_5X5_100
 YOLO_MODEL_PATH = "yolov8n.pt"
 
+# ArUco Config
+# ArUco Config
 # ArUco Config
 CENTER_THRESHOLD = 80      # Pixel threshold for centering
 FOV_MARGIN = 160           # Only detect markers within +/- this pixels from center x
@@ -32,11 +34,11 @@ BURST_REPEAT = 3           # Number of times to repeat action commands
 BURST_FORWARD_DIST = 0.45  # Distance threshold to trigger burst forward
 MIN_DISTANCE = 0.20        # Minimum safety distance
 MAX_DISTANCE = 3.0         # Ignored if further
-MARKER_LENGTH = 0.06       # Marker side length in meters (Total 6cm)
+MARKER_LENGTH = 0.05       # Marker side length in meters (for pose estimation)
 
 # Control Config
-CONTROL_COOLDOWN = 0.5
-CONTROL_FRAME_INTERVAL = 3
+CONTROL_COOLDOWN = 0.5     
+CONTROL_FRAME_INTERVAL = 3 
 
 # Map User Input to Class Names
 TARGET_CLASS_MAP = {
@@ -157,7 +159,11 @@ class HybridTracker:
 
     def detect_aruco(self, color_image, depth_frame):
         t0 = time.time()
-        corners, ids, rejected = self.detector.detectMarkers(color_image)
+        # corners, ids, _ = cv2.aruco.detectMarkers(
+        #     color_image, self.aruco_dict, parameters=self.aruco_params
+        # )
+        detector = cv2.aruco.ArucoDetector(dictionary, parameters)
+        corners, ids, rejected = detector.detectMarkers(image)
         self.last_infer_ms = (time.time() - t0) * 1000.0
 
         detections = []

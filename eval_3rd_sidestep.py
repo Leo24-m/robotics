@@ -95,6 +95,7 @@ class HybridEvaluator:
         self.buffered_id = None
         self.initial_scan_done = False
         self.approach_lost_time = None
+        self.yolo_action_counter = 0  # Counter for YOLO detection interval
         
         # Performance
         self.last_frame_time = time.time()
@@ -328,44 +329,55 @@ class HybridEvaluator:
                     command = sidestep_cmd
 
         elif self.state == 'M9_CENTERING':
-            # Approach/Center M9 until it is centered and close enough?
-            # User requirement: "9번 마커가 가운데 인식된 뒤에" (After M9 is detected in center)
+            # Step 1: Approach M9 to 1.2m while keeping it centered
             target = next((d for d in aruco_dets if d['id'] == 9), None)
             if target:
                 target_info = target
                 cx = target['center'][0]
                 dist = target['distance']
                 
-                # Check Center
-                if abs(cx - 320) < CENTER_THRESHOLD:
-                    # Centered!
-                    print(f"[STATE] M9 Centered. Switching to YOLO_TRACKING.")
-                    self.state = 'YOLO_TRACKING'
-                    command = 'stop'
-                else:
-                    # Align
+                # First: Center the marker
+                if abs(cx - 320) > CENTER_THRESHOLD:
                     command = 'left' if (cx < 320) else 'right'
+                # Then: Check distance
+                elif dist > M9_CHECK_DIST:
+                    # Still far, keep approaching
+                    command = 'forward'
+                else:
+                    # Reached 1.2m and centered!
+                    print(f"[STATE] M9 Reached ({dist:.2f}m). Switching to YOLO_TRACKING.")
+                    self.state = 'YOLO_TRACKING'
+                    self.yolo_action_counter = 0  # Reset counter
+                    command = 'stop'
             else:
                 print("[STATE] M9 Lost. Searching...")
                 command = 'left'
 
         elif self.state == 'YOLO_TRACKING':
+            # YOLO Detection every 3 actions
+            self.yolo_action_counter += 1
+            
             if not self.model_ready:
                 print("Waiting for YOLO...")
                 command = 'stop'
-            else:
-                # Find target class
+            elif self.yolo_action_counter >= 3:
+                # Run YOLO detection this action
+                self.yolo_action_counter = 0  # Reset
                 found = next((d for d in yolo_dets if d['class'] == self.target_class), None)
                 if found:
                     cx = found['center'][0]
-                    print(f"[STATE] Tracking {self.target_class} at {cx}")
+                    print(f"[STATE] YOLO Found {self.target_class} at {cx}")
                     if abs(cx - 320) > CENTER_THRESHOLD:
                         command = 'left' if (cx < 320) else 'right'
                     else:
                         command = 'forward'
                 else:
-                     print(f"[STATE] Target {self.target_class} Not Found. Scanning...")
-                     command = 'right' # Default scan?
+                     print(f"[STATE] YOLO Target {self.target_class} Not Found. Scanning...")
+                     command = 'right'
+            else:
+                # Non-YOLO action: Just move forward blindly or maintain last command
+                print(f"[STATE] YOLO_TRACKING (Action {self.yolo_action_counter}/3). Moving forward.")
+                command = 'forward' # Default scan?
 
         return img, all_dets, command, self.state, target_info
 

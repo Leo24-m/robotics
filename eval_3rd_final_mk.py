@@ -56,8 +56,8 @@ class NavigationConfig:
     FRAME_HEIGHT: int = 480
     
     # ArUco Configuration
-    MARKER_DICT_TYPE: int = cv2.aruco.DICT_5X5_100
-    MARKER_LENGTH: float = 0.05  # Marker side length in meters
+    MARKER_DICT_TYPE: int = cv2.aruco.DICT_4X4_100
+    MARKER_LENGTH = 0.0268       # meters (마커 한 변 실제 길이)
     
     # Navigation thresholds (ratio-based for resolution independence)
     CENTER_THRESHOLD_RATIO: float = 0.125  # 80/640

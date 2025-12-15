@@ -44,7 +44,7 @@ YOLO_MODEL_PATH = "yolov8n.pt"
 # Navigation Params
 FOV_MARGIN = 160           # Center locking margin
 CENTER_THRESHOLD = 80      # Forward alignment
-APPROACH_STOP_DIST = 0.30  # Stop ArUco approach at 30cm
+APPROACH_STOP_DIST = 0.18  # Stop ArUco approach at 18cm [UPDATED]
 M9_CHECK_DIST = 1.20       # Stop at 1.2m for YOLO check
 TURN_WAIT_TIME = 2.0       # Wait after turn
 
@@ -237,9 +237,18 @@ class HybridEvaluator:
         # 1. Detection
         # Always check ArUco
         aruco_dets = self.detect_aruco(img, d_frame)
+        
+        # YOLO: Only detect if we found Marker 9 or are already looking for it
         yolo_dets = []
-        if self.model_ready:
-             yolo_dets = self.detect_yolo(img) # Optional optimization: only run if needed
+        should_run_yolo = (self.state in ['M9_APPROACH', 'M9_CHECK', 'FINAL_APPROACH'])
+        # Also check if we just found M9 in this frame (handled in state logic below, but we might miss frame 1 visualization)
+        # Actually, let's keep it simple: Only run if state demands it OR if we detect ID 9 in ArUco list (to be safe for immediate switch)
+        
+        # Optimization: Check for ID 9 in ArUco list to trigger mode switch prep (optional)
+        has_m9 = any(d['id'] == 9 for d in aruco_dets)
+        
+        if self.model_ready and (should_run_yolo or has_m9):
+             yolo_dets = self.detect_yolo(img) 
             
         all_dets = aruco_dets + yolo_dets
         command = 'stop'

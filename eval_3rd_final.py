@@ -118,6 +118,10 @@ class HybridEvaluator:
         self.buffered_id = None  # ID of the marker we are currently locked onto
         self.state_timer = 0.0
         self.initial_scan_done = False # [NEW] flag
+        
+        # Performance
+        self.last_frame_time = time.time()
+        self.fps = 0.0
 
     def _load_yolo(self):
         print(">>> YOLO Loading (Async)...")

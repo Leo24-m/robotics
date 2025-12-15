@@ -162,9 +162,11 @@ class HybridTracker:
 
     def detect_aruco(self, color_image, depth_frame):
         t0 = time.time()
-        corners, ids, _ = cv2.aruco.detectMarkers(
-            color_image, self.aruco_dict, parameters=self.aruco_params
-        )
+        # corners, ids, _ = cv2.aruco.detectMarkers(
+        #     color_image, self.aruco_dict, parameters=self.aruco_params
+        # )
+        detector = cv2.aruco.ArucoDetector(dictionary, parameters)
+        corners, ids, rejected = detector.detectMarkers(image)
         self.last_infer_ms = (time.time() - t0) * 1000.0
         
         detections = []

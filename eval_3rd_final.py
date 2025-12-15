@@ -119,6 +119,111 @@ class HybridEvaluator:
         self.state_timer = 0.0
         self.initial_scan_done = False # [NEW] flag
 
+    def _load_yolo(self):
+        print(">>> YOLO Loading (Async)...")
+        try:
+            self.model = YOLO(YOLO_MODEL_PATH)
+            self.model_ready = True
+            print(">>> YOLO Loaded.")
+        except Exception as e:
+            print(f"!!! YOLO Load Failed: {e}")
+
+    def start(self):
+        profile = self.pipeline.start(self.config)
+        color_stream = profile.get_stream(rs.stream.color)
+        
+        # Store actual intrinsics object for rs2_deproject_pixel_to_point
+        self.intrinsics = color_stream.as_video_stream_profile().get_intrinsics()
+        
+        # Matrix form for OpenCV
+        self.camera_matrix = np.array([[self.intrinsics.fx, 0, self.intrinsics.ppx], 
+                                       [0, self.intrinsics.fy, self.intrinsics.ppy], 
+                                       [0, 0, 1]], dtype=float)
+        self.dist_coeffs = np.array(self.intrinsics.coeffs)
+        return True
+
+    def stop(self):
+        self.pipeline.stop()
+
+    def get_frame(self):
+        frames = self.pipeline.wait_for_frames()
+        aligned_frames = self.align.process(frames)
+        color_frame = aligned_frames.get_color_frame()
+        depth_frame = aligned_frames.get_depth_frame()
+        
+        now = time.time()
+        dt = now - self.last_frame_time
+        if dt > 0: self.fps = 1.0/dt
+        self.last_frame_time = now
+        
+        return color_frame, depth_frame
+
+    def detect_aruco(self, img, depth_frame):
+        # 1. Detect
+        corners, ids, _ = self.detector.detectMarkers(img)
+        detections = []
+        if ids is not None:
+            # 2. Estimate Pose
+            rvecs, tvecs, _ = cv2.aruco.estimatePoseSingleMarkers(
+                corners, MARKER_LENGTH, self.camera_matrix, self.dist_coeffs
+            )
+            ids = ids.flatten()
+            for i, mid in enumerate(ids):
+                # Basic Info
+                c = corners[i][0]
+                cx, cy = int(np.mean(c[:, 0])), int(np.mean(c[:, 1]))
+                
+                rv = rvecs[i].reshape(3,1)
+                tv = tvecs[i].reshape(3,1)
+                
+                # Robust Distance (Depth + Pose Fusion)
+                dist_depth = get_distance_at_point(depth_frame, cx, cy)
+                
+                # Compute Goal/Position using check_aruco_2 logic
+                if dist_depth:
+                    # Deproject using REAL intrinsics object
+                    p = rs.rs2_deproject_pixel_to_point(
+                        self.intrinsics, [float(cx), float(cy)], float(dist_depth)
+                    )
+                    tvec_final = np.array([[p[0]], [p[1]], [p[2]]], dtype=np.float32)
+                    dist_src = "depth"
+                else:
+                    tvec_final = tv
+                    dist_src = "pose" # fallback
+
+                # Distances
+                dist_3d = float(np.linalg.norm(tvec_final))
+                
+                detections.append({
+                    'type': 'aruco',
+                    'id': int(mid),
+                    'corners': c,
+                    'center': (cx, cy),
+                    'distance': dist_3d,
+                    'rvec': rv,
+                    'tvec': tvec_final,
+                    'dist_src': dist_src
+                })
+        return detections
+
+    def detect_yolo(self, img):
+        if not self.model_ready: return []
+        results = self.model(img, conf=0.5, verbose=False)
+        detections = []
+        for result in results:
+            for box in result.boxes:
+                cls_id = int(box.cls[0])
+                cls_name = self.model.names[cls_id]
+                x1,y1,x2,y2 = map(int, box.xyxy[0])
+                cx, cy = (x1+x2)//2, (y1+y2)//2
+                detections.append({
+                    'type': 'yolo',
+                    'class': cls_name,
+                    'center': (cx, cy),
+                    'bbox': (x1,y1,x2,y2)
+                })
+        return detections
+
     def process(self):
         c_frame, d_frame = self.get_frame()
         if not c_frame: return None, None, 'none', self.state, None
@@ -137,6 +242,9 @@ class HybridEvaluator:
         target_info = None
 
         curr_time = time.time()
+        
+        # Action Counter Init (if not exists)
+        if not hasattr(self, 'action_counter'): self.action_counter = 0
 
         # --- STATE MACHINE ---
         
@@ -199,7 +307,7 @@ class HybridEvaluator:
                  self.buffered_id = 9
                  self.state = 'M9_APPROACH'
                  print(f"[STATE] Found ID 9! Switching to M9_APPROACH.")
-                 return img, all_dets, 'stop'
+                 return img, all_dets, 'stop', self.state, m9
 
             if target:
                 target_info = target

@@ -138,11 +138,15 @@ class HybridEvaluator:
     def start(self):
         profile = self.pipeline.start(self.config)
         color_stream = profile.get_stream(rs.stream.color)
-        intr = color_stream.as_video_stream_profile().get_intrinsics()
-        self.camera_matrix = np.array([[intr.fx, 0, intr.ppx], 
-                                       [0, intr.fy, intr.ppy], 
+        
+        # Store actual intrinsics object for rs2_deproject_pixel_to_point
+        self.intrinsics = color_stream.as_video_stream_profile().get_intrinsics()
+        
+        # Matrix form for OpenCV
+        self.camera_matrix = np.array([[self.intrinsics.fx, 0, self.intrinsics.ppx], 
+                                       [0, self.intrinsics.fy, self.intrinsics.ppy], 
                                        [0, 0, 1]], dtype=float)
-        self.dist_coeffs = np.array(intr.coeffs)
+        self.dist_coeffs = np.array(self.intrinsics.coeffs)
         return True
 
     def stop(self):
@@ -184,9 +188,9 @@ class HybridEvaluator:
                 
                 # Compute Goal/Position using check_aruco_2 logic
                 if dist_depth:
-                    # Deproject
+                    # Deproject using REAL intrinsics object
                     p = rs.rs2_deproject_pixel_to_point(
-                        self.get_intrinsics_obj(), [float(cx), float(cy)], float(dist_depth)
+                        self.intrinsics, [float(cx), float(cy)], float(dist_depth)
                     )
                     tvec_final = np.array([[p[0]], [p[1]], [p[2]]], dtype=np.float32)
                     dist_src = "depth"
@@ -226,22 +230,6 @@ class HybridEvaluator:
                     'bbox': (x1,y1,x2,y2)
                 })
         return detections
-
-    def get_intrinsics_obj(self):
-        # Helper to create rs2_intrinsics object from matrix (if needed) or store it from profile
-        # For simplicity, we just used matrix. But rs2_deproject needs intrinsics object.
-        # We can construct a simple struct or object.
-        class Intrinsics:
-            def __init__(self, mat, coeffs):
-                self.fx = mat[0,0]
-                self.fy = mat[1,1]
-                self.ppx = mat[0,2]
-                self.ppy = mat[1,2]
-                self.model = rs.distortion.inverse_brown_conrady # Approximation
-                self.coeffs = list(coeffs)
-                self.width = 640
-                self.height = 480
-        return Intrinsics(self.camera_matrix, self.dist_coeffs)
 
     def process(self):
         c_frame, d_frame = self.get_frame()

@@ -125,10 +125,10 @@ class Poses:
     FORWARD_INTERM_A = Position(2086, 1681, 2202)
     FORWARD_INTERM_B = Position(2009, 1681, 2202)
     
-    FORWARD_POS_11 = Position(2418, 2432, 1409)
-    FORWARD_POS_12 = Position(1754, 2057, 2413)
-    FORWARD_POS_13 = Position(1677, 2432, 1409)
-    FORWARD_POS_14 = Position(2341, 2057, 2413)
+    FORWARD_POS_11 = Position(2418, 2432, 1409) # 2
+    FORWARD_POS_12 = Position(1754, 2057, 2413) # 4
+    FORWARD_POS_13 = Position(1677, 2432, 1409) # 1
+    FORWARD_POS_14 = Position(2341, 2057, 2413) # 3
     
     BACKWARD_POS_11 = Position(1754, 2057, 2413)
     BACKWARD_POS_12 = Position(2418, 2432, 1409)
@@ -148,37 +148,33 @@ class Poses:
     
     # Walk Left Positions (왼쪽 다리 4,3을 앞다리로 취급)
     # move_forward 매핑: 1→4, 4→3, 2→1, 3→2
-    WALK_LEFT_INTERM_A = Position(2086, 1681, 2202)  # 다리 4,3 들기용
-    WALK_LEFT_INTERM_B = Position(2009, 1681, 2202)  # 다리 1,2 들기용
     
     # Power stroke positions (forward에서 회전)
-    WALK_LEFT_POS_4 = Position(1677, 2432, 1409)  # 다리4 = forward의 다리1 
-    WALK_LEFT_POS_3 = Position(1754, 2057, 2413)  # 다리3 = forward의 다리4
-    WALK_LEFT_POS_1 = Position(2418, 2432, 1409)  # 다리1 = forward의 다리2
-    WALK_LEFT_POS_2 = Position(2341, 2057, 2413)  # 다리2 = forward의 다리3
+    WALK_LEFT_POS_4 = Position(1677, 2432, 1409)  # 다리4 = forward의 다리1 (13)
+    WALK_LEFT_POS_3 = Position(1754, 2057, 2413)  # 다리3 = forward의 다리4 (12)
+    WALK_LEFT_POS_1 = Position(2418, 2432, 1409)  # 다리1 = forward의 다리2 (11)
+    WALK_LEFT_POS_2 = Position(2341, 2057, 2413)  # 다리2 = forward의 다리3 (14)
     
     # Return stroke positions (forward에서 회전)
-    WALK_LEFT_BACK_4 = Position(2341, 2057, 2413)  # 다리4 = forward의 다리1 backward
-    WALK_LEFT_BACK_3 = Position(2418, 2432, 1409)  # 다리3 = forward의 다리4 backward
-    WALK_LEFT_BACK_1 = Position(1754, 2057, 2413)  # 다리1 = forward의 다리2 backward
-    WALK_LEFT_BACK_2 = Position(1677, 2432, 1409)  # 다리2 = forward의 다리3 backward
+    WALK_LEFT_BACK_4 = Position(2341, 2057, 2413)  # 다리4 = forward의 다리1 backward (13)
+    WALK_LEFT_BACK_3 = Position(2418, 2432, 1409)  # 다리3 = forward의 다리4 backward (12)
+    WALK_LEFT_BACK_1 = Position(1754, 2057, 2413)  # 다리1 = forward의 다리2 backward (11)
+    WALK_LEFT_BACK_2 = Position(1677, 2432, 1409)  # 다리2 = forward의 다리3 backward (14)
     
     # Walk Right Positions (오른쪽 다리 1,2를 앞다리로 취급)
     # move_forward 매핑: forward의 4→1, 3→2, 1→4, 2→3 (반시계 회전)
-    WALK_RIGHT_INTERM_A = Position(2086, 1681, 2202)  # 다리 1,2 들기용
-    WALK_RIGHT_INTERM_B = Position(2009, 1681, 2202)  # 다리 4,3 들기용
     
     # Power stroke positions (forward에서 회전)
-    WALK_RIGHT_POS_1 = Position(1754, 2057, 2413)  # 다리1 = forward의 다리4
     WALK_RIGHT_POS_2 = Position(2341, 2057, 2413)  # 다리2 = forward의 다리3
-    WALK_RIGHT_POS_4 = Position(1677, 2432, 1409)  # 다리4 = forward의 다리1
+    WALK_RIGHT_POS_1 = Position(1754, 2057, 2413)  # 다리1 = forward의 다리4
     WALK_RIGHT_POS_3 = Position(2418, 2432, 1409)  # 다리3 = forward의 다리2
+    WALK_RIGHT_POS_4 = Position(1677, 2432, 1409)  # 다리4 = forward의 다리1
     
     # Return stroke positions (forward에서 회전)
-    WALK_RIGHT_BACK_1 = Position(2418, 2432, 1409)  # 다리1 = forward의 다리4 backward
     WALK_RIGHT_BACK_2 = Position(1677, 2432, 1409)  # 다리2 = forward의 다리3 backward
-    WALK_RIGHT_BACK_4 = Position(2341, 2057, 2413)  # 다리4 = forward의 다리1 backward
+    WALK_RIGHT_BACK_1 = Position(2418, 2432, 1409)  # 다리1 = forward의 다리4 backward
     WALK_RIGHT_BACK_3 = Position(1754, 2057, 2413)  # 다리3 = forward의 다리2 backward
+    WALK_RIGHT_BACK_4 = Position(2341, 2057, 2413)  # 다리4 = forward의 다리1 backward
 
 
 @dataclass
@@ -333,14 +329,14 @@ class GaitPatterns:
         move_forward의 Trot 패턴 유지 (대각선으로 들기)
         
         forward: 2,4 들기 / 1,3 들기
-        left:    1,3 들기 / 2,4 들기  (역순)
+        left:    1,3 들기 / 2,4 들기 
         """
         return [
             # Step 1: 다리 1,3 들기 (대각선 - forward의 2,4에 해당)
             GaitStep(
                 movements={
-                    1: Poses.WALK_LEFT_INTERM_A,  # Front-Right
-                    3: Poses.WALK_LEFT_INTERM_A,  # Back-Left
+                    1: Poses.FORWARD_INTERM_A,  # Front-Right
+                    3: Poses.FORWARD_INTERM_A,  # Back-Left
                 },
                 duration_type='return',
                 description="Lift legs 1,3 (diagonal pair)"
@@ -361,8 +357,8 @@ class GaitPatterns:
             # Step 3: 다리 2,4 들기 (대각선 - forward의 1,3에 해당)
             GaitStep(
                 movements={
-                    2: Poses.WALK_LEFT_INTERM_B,  # Back-Right
-                    4: Poses.WALK_LEFT_INTERM_B,  # Front-Left
+                    2: Poses.FORWARD_INTERM_B,  # Back-Right
+                    4: Poses.FORWARD_INTERM_B,  # Front-Left
                 },
                 duration_type='return',
                 description="Lift legs 2,4 (diagonal pair)"
@@ -400,8 +396,8 @@ class GaitPatterns:
             # Step 1: 다리 3,1 들기 (대각선 - 뒤3 + 앞1)
             GaitStep(
                 movements={
-                    3: Poses.WALK_RIGHT_INTERM_A,  # Back-Left (뒷다리)
-                    1: Poses.WALK_RIGHT_INTERM_A,  # Front-Right (앞다리)
+                    3: Poses.FORWARD_INTERM_A,  # Back-Left (뒷다리)
+                    1: Poses.FORWARD_INTERM_A,  # Front-Right (앞다리)
                 },
                 duration_type='return',
                 description="Lift legs 3,1 (diagonal pair)"
@@ -410,10 +406,10 @@ class GaitPatterns:
             # Step 2: Power stroke
             GaitStep(
                 movements={
-                    1: Poses.WALK_RIGHT_POS_1,  # 다리1 = forward의 다리4 역할
                     2: Poses.WALK_RIGHT_POS_2,  # 다리2 = forward의 다리3 역할
-                    4: Poses.WALK_RIGHT_POS_4,  # 다리4 = forward의 다리1 역할
+                    1: Poses.WALK_RIGHT_POS_1,  # 다리1 = forward의 다리4 역할
                     3: Poses.WALK_RIGHT_POS_3,  # 다리3 = forward의 다리2 역할
+                    4: Poses.WALK_RIGHT_POS_4,  # 다리4 = forward의 다리1 역할
                 },
                 duration_type='power',
                 description="Power stroke - all legs push right"
@@ -422,8 +418,8 @@ class GaitPatterns:
             # Step 3: 다리 4,2 들기 (대각선 - 뒤4 + 앞2)
             GaitStep(
                 movements={
-                    4: Poses.WALK_RIGHT_INTERM_B,  # Front-Left (뒷다리)
-                    2: Poses.WALK_RIGHT_INTERM_B,  # Back-Right (앞다리)
+                    4: Poses.FORWARD_INTERM_B,  # Front-Left (뒷다리)
+                    2: Poses.FORWARD_INTERM_B,  # Back-Right (앞다리)
                 },
                 duration_type='return',
                 description="Lift legs 4,2 (diagonal pair)"
@@ -432,10 +428,10 @@ class GaitPatterns:
             # Step 4: Return stroke
             GaitStep(
                 movements={
-                    1: Poses.WALK_RIGHT_BACK_1,  # 다리1
                     2: Poses.WALK_RIGHT_BACK_2,  # 다리2
-                    4: Poses.WALK_RIGHT_BACK_4,  # 다리4
+                    1: Poses.WALK_RIGHT_BACK_1,  # 다리1
                     3: Poses.WALK_RIGHT_BACK_3,  # 다리3
+                    4: Poses.WALK_RIGHT_BACK_4,  # 다리4
                 },
                 duration_type='power',
                 description="Return stroke - complete cycle"

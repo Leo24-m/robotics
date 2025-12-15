@@ -49,9 +49,9 @@ LEN_PRESENT_POSITION = 4
 MOTORS_PER_LEG = 3
 LEG_IDS = {
     1: [0, 1, 2],    # Front-Right
-    2: [3, 4, 5],    # Front-Left
+    2: [3, 4, 5],    # Back-Right
     3: [6, 7, 8],    # Back-Left
-    4: [9, 10, 11]   # Back-Right
+    4: [9, 10, 11]   # Front-Left
 }
 ALL_MOTOR_IDS = [id for ids in LEG_IDS.values() for id in ids]
 
@@ -146,35 +146,39 @@ class Poses:
     RIGHT_STEP = Position(1895, 2141, 2228)
     RIGHT_INTERM = Position(1995, 1804, 2094)
     
-    # Walk Left Positions (왼쪽 다리 2,3을 앞다리로 취급)
-    # move_forward 패턴을 왼쪽 이동에 맞게 회전
-    WALK_LEFT_INTERM_A = Position(2086, 1681, 2202)  # 다리 2,3 들기용
-    WALK_LEFT_INTERM_B = Position(2009, 1681, 2202)  # 다리 1,4 들기용
+    # Walk Left Positions (왼쪽 다리 4,3을 앞다리로 취급)
+    # move_forward 매핑: 1→4, 4→3, 2→1, 3→2
+    WALK_LEFT_INTERM_A = Position(2086, 1681, 2202)  # 다리 4,3 들기용
+    WALK_LEFT_INTERM_B = Position(2009, 1681, 2202)  # 다리 1,2 들기용
     
-    WALK_LEFT_POS_11 = Position(2418, 2432, 1409)  # 다리2 power
-    WALK_LEFT_POS_12 = Position(1754, 2057, 2413)  # 다리3 power
-    WALK_LEFT_POS_13 = Position(1677, 2432, 1409)  # 다리1 power
-    WALK_LEFT_POS_14 = Position(2341, 2057, 2413)  # 다리4 power
+    # Power stroke positions (forward에서 회전)
+    WALK_LEFT_POS_4 = Position(1677, 2432, 1409)  # 다리4 = forward의 다리1 
+    WALK_LEFT_POS_3 = Position(1754, 2057, 2413)  # 다리3 = forward의 다리4
+    WALK_LEFT_POS_1 = Position(2418, 2432, 1409)  # 다리1 = forward의 다리2
+    WALK_LEFT_POS_2 = Position(2341, 2057, 2413)  # 다리2 = forward의 다리3
     
-    WALK_LEFT_BACKWARD_11 = Position(1754, 2057, 2413)  # 다리2 return
-    WALK_LEFT_BACKWARD_12 = Position(2418, 2432, 1409)  # 다리3 return
-    WALK_LEFT_BACKWARD_13 = Position(2341, 2057, 2413)  # 다리1 return
-    WALK_LEFT_BACKWARD_14 = Position(1677, 2432, 1409)  # 다리4 return
+    # Return stroke positions (forward에서 회전)
+    WALK_LEFT_BACK_4 = Position(2341, 2057, 2413)  # 다리4 = forward의 다리1 backward
+    WALK_LEFT_BACK_3 = Position(2418, 2432, 1409)  # 다리3 = forward의 다리4 backward
+    WALK_LEFT_BACK_1 = Position(1754, 2057, 2413)  # 다리1 = forward의 다리2 backward
+    WALK_LEFT_BACK_2 = Position(1677, 2432, 1409)  # 다리2 = forward의 다리3 backward
     
-    # Walk Right Positions (오른쪽 다리 1,4를 앞다리로 취급)
-    # move_forward 패턴을 오른쪽 이동에 맞게 회전
-    WALK_RIGHT_INTERM_A = Position(2086, 1681, 2202)  # 다리 1,4 들기용
-    WALK_RIGHT_INTERM_B = Position(2009, 1681, 2202)  # 다리 2,3 들기용
+    # Walk Right Positions (오른쪽 다리 1,2를 앞다리로 취급)
+    # move_forward 매핑: 1→1, 4→2, 2→4, 3→3
+    WALK_RIGHT_INTERM_A = Position(2086, 1681, 2202)  # 다리 1,2 들기용
+    WALK_RIGHT_INTERM_B = Position(2009, 1681, 2202)  # 다리 4,3 들기용
     
-    WALK_RIGHT_POS_11 = Position(1677, 2432, 1409)  # 다리1 power
-    WALK_RIGHT_POS_12 = Position(2341, 2057, 2413)  # 다리4 power
-    WALK_RIGHT_POS_13 = Position(2418, 2432, 1409)  # 다리2 power
-    WALK_RIGHT_POS_14 = Position(1754, 2057, 2413)  # 다리3 power
+    # Power stroke positions (forward에서 회전)
+    WALK_RIGHT_POS_1 = Position(1677, 2432, 1409)  # 다리1 = forward의 다리1
+    WALK_RIGHT_POS_2 = Position(1754, 2057, 2413)  # 다리2 = forward의 다리4
+    WALK_RIGHT_POS_4 = Position(2418, 2432, 1409)  # 다리4 = forward의 다리2
+    WALK_RIGHT_POS_3 = Position(2341, 2057, 2413)  # 다리3 = forward의 다리3
     
-    WALK_RIGHT_BACKWARD_11 = Position(2341, 2057, 2413)  # 다리1 return
-    WALK_RIGHT_BACKWARD_12 = Position(1677, 2432, 1409)  # 다리4 return
-    WALK_RIGHT_BACKWARD_13 = Position(1754, 2057, 2413)  # 다리2 return
-    WALK_RIGHT_BACKWARD_14 = Position(2418, 2432, 1409)  # 다리3 return
+    # Return stroke positions (forward에서 회전)
+    WALK_RIGHT_BACK_1 = Position(2341, 2057, 2413)  # 다리1 = forward의 다리1 backward
+    WALK_RIGHT_BACK_2 = Position(2418, 2432, 1409)  # 다리2 = forward의 다리4 backward
+    WALK_RIGHT_BACK_4 = Position(1754, 2057, 2413)  # 다리4 = forward의 다리2 backward
+    WALK_RIGHT_BACK_3 = Position(1677, 2432, 1409)  # 다리3 = forward의 다리3 backward
 
 
 @dataclass
@@ -319,49 +323,55 @@ class GaitPatterns:
     @staticmethod
     def sidestep_left_gait() -> List[GaitStep]:
         """
-        왼쪽으로 걷기 - 왼쪽 다리(2,3)를 앞다리로 취급한 보행
-        move_forward 패턴을 그대로 사용하되, 왼쪽 다리가 "앞"으로 가는 역할
+        왼쪽으로 걷기 - 왼쪽 다리(4,3)을 앞다리로 취급한 보행
+        
+        로봇 배치:     4(FL)---1(FR)  (앞)
+                      |           |
+                      3(BL)---2(BR)  (뒤)
+        
+        왼쪽 이동 시:  4,3(앞) --- 1,2(뒤)
+        move_forward의 1→4, 4→3, 2→1, 3→2로 매핑
         """
         return [
-            # Step 1: 왼쪽 다리(2,3) 들기 - forward의 2,4와 동일한 역할
+            # Step 1: 다리 4,3 들기 (왼쪽 다리 = 앞다리 역할)
             GaitStep(
                 movements={
-                    2: Poses.WALK_LEFT_INTERM_A,  # 왼쪽 앞다리
-                    3: Poses.WALK_LEFT_INTERM_A,  # 왼쪽 뒷다리
+                    4: Poses.WALK_LEFT_INTERM_A,  # Front-Left
+                    3: Poses.WALK_LEFT_INTERM_A,  # Back-Left
                 },
                 duration_type='return',
-                description="Lift left legs (2,3) - leading legs"
+                description="Lift legs 4,3 - leading legs for left walk"
             ),
             
             # Step 2: Power stroke - 모든 다리 동시 이동
             GaitStep(
                 movements={
-                    2: Poses.WALK_LEFT_POS_11,      # 왼쪽 앞다리
-                    3: Poses.WALK_LEFT_POS_12,      # 왼쪽 뒷다리
-                    1: Poses.WALK_LEFT_POS_13,      # 오른쪽 앞다리
-                    4: Poses.WALK_LEFT_POS_14,      # 오른쪽 뒷다리
+                    4: Poses.WALK_LEFT_POS_4,  # 다리4 (forward의 다리1 역할)
+                    3: Poses.WALK_LEFT_POS_3,  # 다리3 (forward의 다리4 역할)
+                    1: Poses.WALK_LEFT_POS_1,  # 다리1 (forward의 다리2 역할)
+                    2: Poses.WALK_LEFT_POS_2,  # 다리2 (forward의 다리3 역할)
                 },
                 duration_type='power',
                 description="Power stroke - all legs push left"
             ),
             
-            # Step 3: 오른쪽 다리(1,4) 들기
+            # Step 3: 다리 1,2 들기 (오른쪽 다리 = 뒷다리 역할)
             GaitStep(
                 movements={
-                    1: Poses.WALK_LEFT_INTERM_B,  # 오른쪽 앞다리
-                    4: Poses.WALK_LEFT_INTERM_B,  # 오른쪽 뒷다리
+                    1: Poses.WALK_LEFT_INTERM_B,  # Front-Right
+                    2: Poses.WALK_LEFT_INTERM_B,  # Back-Right
                 },
                 duration_type='return',
-                description="Lift right legs (1,4) - following legs"
+                description="Lift legs 1,2 - following legs"
             ),
             
             # Step 4: Return stroke - 모든 다리 복귀
             GaitStep(
                 movements={
-                    2: Poses.WALK_LEFT_BACKWARD_11,  # 왼쪽 앞다리
-                    3: Poses.WALK_LEFT_BACKWARD_12,  # 왼쪽 뒷다리
-                    1: Poses.WALK_LEFT_BACKWARD_13,  # 오른쪽 앞다리
-                    4: Poses.WALK_LEFT_BACKWARD_14,  # 오른쪽 뒷다리
+                    4: Poses.WALK_LEFT_BACK_4,  # 다리4
+                    3: Poses.WALK_LEFT_BACK_3,  # 다리3
+                    1: Poses.WALK_LEFT_BACK_1,  # 다리1
+                    2: Poses.WALK_LEFT_BACK_2,  # 다리2
                 },
                 duration_type='power',
                 description="Return stroke - complete cycle"
@@ -371,49 +381,55 @@ class GaitPatterns:
     @staticmethod
     def sidestep_right_gait() -> List[GaitStep]:
         """
-        오른쪽으로 걷기 - 오른쪽 다리(1,4)를 앞다리로 취급한 보행
-        move_forward 패턴을 그대로 사용하되, 오른쪽 다리가 "앞"으로 가는 역할
+        오른쪽으로 걷기 - 오른쪽 다리(1,2)를 앞다리로 취급한 보행
+        
+        로봇 배치:     4(FL)---1(FR)  (앞)
+                      |           |
+                      3(BL)---2(BR)  (뒤)
+        
+        오른쪽 이동 시: 1,2(앞) --- 4,3(뒤)
+        move_forward의 1→1, 4→2, 2→4, 3→3으로 매핑
         """
         return [
-            # Step 1: 오른쪽 다리(1,4) 들기
+            # Step 1: 다리 1,2 들기 (오른쪽 다리 = 앞다리 역할)
             GaitStep(
                 movements={
-                    1: Poses.WALK_RIGHT_INTERM_A,  # 오른쪽 앞다리
-                    4: Poses.WALK_RIGHT_INTERM_A,  # 오른쪽 뒷다리
+                    1: Poses.WALK_RIGHT_INTERM_A,  # Front-Right
+                    2: Poses.WALK_RIGHT_INTERM_A,  # Back-Right
                 },
                 duration_type='return',
-                description="Lift right legs (1,4) - leading legs"
+                description="Lift legs 1,2 - leading legs for right walk"
             ),
             
             # Step 2: Power stroke
             GaitStep(
                 movements={
-                    1: Poses.WALK_RIGHT_POS_11,     # 오른쪽 앞다리
-                    4: Poses.WALK_RIGHT_POS_12,     # 오른쪽 뒷다리
-                    2: Poses.WALK_RIGHT_POS_13,     # 왼쪽 앞다리
-                    3: Poses.WALK_RIGHT_POS_14,     # 왼쪽 뒷다리
+                    1: Poses.WALK_RIGHT_POS_1,  # 다리1 (forward의 다리1 역할)
+                    2: Poses.WALK_RIGHT_POS_2,  # 다리2 (forward의 다리4 역할)
+                    4: Poses.WALK_RIGHT_POS_4,  # 다리4 (forward의 다리2 역할)
+                    3: Poses.WALK_RIGHT_POS_3,  # 다리3 (forward의 다리3 역할)
                 },
                 duration_type='power',
                 description="Power stroke - all legs push right"
             ),
             
-            # Step 3: 왼쪽 다리(2,3) 들기
+            # Step 3: 다리 4,3 들기 (왼쪽 다리 = 뒷다리 역할)
             GaitStep(
                 movements={
-                    2: Poses.WALK_RIGHT_INTERM_B,  # 왼쪽 앞다리
-                    3: Poses.WALK_RIGHT_INTERM_B,  # 왼쪽 뒷다리
+                    4: Poses.WALK_RIGHT_INTERM_B,  # Front-Left
+                    3: Poses.WALK_RIGHT_INTERM_B,  # Back-Left
                 },
                 duration_type='return',
-                description="Lift left legs (2,3) - following legs"
+                description="Lift legs 4,3 - following legs"
             ),
             
             # Step 4: Return stroke
             GaitStep(
                 movements={
-                    1: Poses.WALK_RIGHT_BACKWARD_11,  # 오른쪽 앞다리
-                    4: Poses.WALK_RIGHT_BACKWARD_12,  # 오른쪽 뒷다리
-                    2: Poses.WALK_RIGHT_BACKWARD_13,  # 왼쪽 앞다리
-                    3: Poses.WALK_RIGHT_BACKWARD_14,  # 왼쪽 뒷다리
+                    1: Poses.WALK_RIGHT_BACK_1,  # 다리1
+                    2: Poses.WALK_RIGHT_BACK_2,  # 다리2
+                    4: Poses.WALK_RIGHT_BACK_4,  # 다리4
+                    3: Poses.WALK_RIGHT_BACK_3,  # 다리3
                 },
                 duration_type='power',
                 description="Return stroke - complete cycle"
@@ -457,12 +473,12 @@ def print_controls():
     print("="*60)
     print(f"  [i] Initialize Pose      -> {Poses.INITIAL.to_list()}")
     print(f"  [s] Stand/Start Pose     -> {Poses.START.to_list()}")
-    print("  [w] Move Forward         -> Normal Speed")
+    print("  [w] Move Forward         -> Normal Speed (다리 1,4 앞)")
     print("  [W] Move Forward (Fast)  -> High Speed")
     print("  [a] Turn Left            -> Trot Pattern (제자리 회전)")
     print("  [d] Turn Right           -> Trot Pattern (제자리 회전)")
-    print("  [z] Walk Left            -> 왼쪽 다리(2,3)를 앞다리로 걷기")
-    print("  [c] Walk Right           -> 오른쪽 다리(1,4)를 앞다리로 걷기")
+    print("  [z] Walk Left            -> 다리 4,3을 앞다리로 (왼쪽 이동)")
+    print("  [c] Walk Right           -> 다리 1,2를 앞다리로 (오른쪽 이동)")
     print("  [t] Disable All Torque   -> Safety Release")
     print("  [q] Quit Program         -> Exit and Disconnect")
     print("="*60 + "\n")
@@ -837,18 +853,18 @@ class QuadrupedRobot:
         return success
     
     def sidestep_left(self) -> bool:
-        """왼쪽으로 걷기 (왼쪽 다리 2,3을 앞다리처럼 사용)"""
+        """왼쪽으로 걷기 (다리 4,3을 앞다리처럼 사용)"""
         self.state = RobotState.WALKING
-        logger.info("Walking left - left legs (2,3) as leading legs")
+        logger.info("Walking left - legs 4,3 as leading legs")
         gait = GaitPatterns.sidestep_left_gait()
         success = self._execute_gait_pattern(gait, GaitSpeed.NORMAL, "Walk Left")
         self.state = RobotState.IDLE if success else RobotState.ERROR
         return success
     
     def sidestep_right(self) -> bool:
-        """오른쪽으로 걷기 (오른쪽 다리 1,4를 앞다리처럼 사용)"""
+        """오른쪽으로 걷기 (다리 1,2를 앞다리처럼 사용)"""
         self.state = RobotState.WALKING
-        logger.info("Walking right - right legs (1,4) as leading legs")
+        logger.info("Walking right - legs 1,2 as leading legs")
         gait = GaitPatterns.sidestep_right_gait()
         success = self._execute_gait_pattern(gait, GaitSpeed.NORMAL, "Walk Right")
         self.state = RobotState.IDLE if success else RobotState.ERROR

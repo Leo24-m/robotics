@@ -159,6 +159,8 @@ class HybridTracker:
 
     def detect_aruco(self, color_image, depth_frame):
         t0 = time.time()
+        
+        # Use ArucoDetector 
         corners, ids, rejected = self.detector.detectMarkers(color_image)
         self.last_infer_ms = (time.time() - t0) * 1000.0
         
@@ -175,11 +177,17 @@ class HybridTracker:
                 c = corners[i][0]
                 cx, cy = int(np.mean(c[:, 0])), int(np.mean(c[:, 1]))
                 
+                # Safe access to rvec/tvec
                 rv = rvecs[i] if self.camera_matrix is not None else None
                 tv = tvecs[i] if self.camera_matrix is not None else None
                 
+                # Reshape for drawing stability
+                if rv is not None: rv = rv.reshape(3, 1)
+                if tv is not None: tv = tv.reshape(3, 1)
+
+                # Use tvec for distance if available (more robust than single pixel depth)
                 if tv is not None:
-                    dist = np.linalg.norm(tv)
+                    dist = float(np.linalg.norm(tv))
                 else:
                     dist = self.get_distance_at_point(depth_frame, cx, cy)
                 
@@ -232,7 +240,7 @@ class HybridTracker:
         
         color_image = np.asanyarray(color_frame.get_data())
         
-        # [NEW] Get Center Depth for Visualization
+        # Get Center Depth for Visualization
         center_depth = self.get_distance_at_point(depth_frame, self.frame_width//2, self.frame_height//2)
         
         all_detections = []
@@ -244,7 +252,7 @@ class HybridTracker:
             detections = self.detect_aruco(color_image, depth_frame)
             all_detections = detections
             
-            # Helper: FOV Filter
+            # Helper: FOV Filter (Still useful for some checks, but searched is relaxed)
             def is_in_fov(d):
                 cx = d['center'][0]
                 return abs(cx - self.frame_width // 2) < FOV_MARGIN
@@ -255,11 +263,14 @@ class HybridTracker:
             # 1. Check for Trigger Marker 9
             marker_9 = next((d for d in detections if d['id'] == 9 and is_in_fov(d)), None)
             
+            # If we see Marker 9 and are close strictly switch
             if marker_9 and marker_9['distance'] and marker_9['distance'] < TARGET_DISTANCE:
+                 # Trigger Switch!
                 print(f">>> MARKER 9 DETECTED ({marker_9['distance']:.2f}m). SWITCHING TO YOLO MODE. TARGET: {self.target_class} <<<")
                 
                 if not self.model_ready:
                     print(">>> WARNING: YOLO Model not ready yet! Waiting... <<<")
+                    # Stop briefly
                     return color_image, None, detections, 'stop', center_depth
 
                 self.mode = 'YOLO'
@@ -269,20 +280,29 @@ class HybridTracker:
             # 2. Navigation Logic
             if self.nav_state == 'SEARCHING':
                 valid_markers = []
-
                 for d in detections:
                     mid = d['id']
                     dist = d['distance']
                     
                     if mid == 9: continue
-                    if dist is None or dist >= MAX_DISTANCE: continue
                     
+                    # Ignore if too far (noise)
+                    if dist is None or dist >= MAX_DISTANCE:
+                        # print(f"DEBUG: Marker {mid} ignored (Dist: {dist})")
+                        continue
+                        
+                    # NOTE: Removed FOV check for SEARCHING. If we see it, we lock and center.
+                    
+                    # Initial Search Restriction: Only look for 1 or 2 first
                     if not self.initial_scan_done:
-                        if mid not in [1, 2]: continue
+                        if mid not in [1, 2]: 
+                            # print(f"DEBUG: Marker {mid} ignored (Initial Scan Wait)")
+                            continue
                         
                     valid_markers.append(d)
                 
                 if valid_markers:
+                    # Found a marker!
                     self.initial_scan_done = True
                     target = min(valid_markers, key=lambda d: d['distance'])
                     self.current_marker_id = target['id']
@@ -290,18 +310,22 @@ class HybridTracker:
                     print(f">>> FOUND MARKER {self.current_marker_id}. APPROACHING. <<<")
                     command = self.get_aruco_command(target)
                 else:
+                    # No marker, keep rotating left
                     command = 'left' 
             
             elif self.nav_state == 'APPROACHING':
+                 # Look for our cached marker id
                  target = next((d for d in detections if d['id'] == self.current_marker_id), None)
                  
                  if target:
                      command = self.get_aruco_command(target)
                      if command.startswith('action_turn'):
+                         # We reached the distance. Transition to turning
                          self.nav_state = 'TURNING'
                          self.state_timer = current_time
                          print(f">>> REACHED MARKER {self.current_marker_id}. TURNING. ({command}) <<<")
                  else:
+                     # Lost marker?
                      print(">>> LOST MARKER DURING APPROACH. SEARCHING. <<<")
                      self.nav_state = 'SEARCHING'
                      command = 'stop'
@@ -311,17 +335,20 @@ class HybridTracker:
                     command = 'action_turn_left'
                 else:
                     command = 'action_turn_right'
+                
                 self.nav_state = 'MOVING_AFTER_TURN'
                 self.state_timer = current_time
                 
             elif self.nav_state == 'MOVING_AFTER_TURN':
+                # Move forward blindly for X seconds
                 if current_time - self.state_timer < self.move_after_turn_duration:
                     command = 'forward'
                 else:
+                    # Done moving, back to search
                     print(">>> MOVE COMPLETE. RESUMING SEARCH. <<<")
                     self.nav_state = 'SEARCHING'
                     self.current_marker_id = None
-                    command = 'stop'
+                    command = 'stop' # Brief stop before search loop
                 
         elif self.mode == 'YOLO':
             # --- YOLO MODE ---
@@ -329,6 +356,7 @@ class HybridTracker:
             all_detections = detections
             
             if detections:
+                # Pick closest target class object
                 valid_objs = [d for d in detections if d['distance'] is not None]
                 if valid_objs:
                     target = min(valid_objs, key=lambda d: d['distance'])
@@ -343,15 +371,18 @@ class HybridTracker:
         dist = target['distance']
         marker_id = target['id']
 
+        # Centering
         offset = cx - (self.frame_width // 2)
         if abs(offset) > CENTER_THRESHOLD:
             return 'left' if offset < 0 else 'right'
             
+        # Distance/Action
         if dist > TARGET_DISTANCE:
             if dist > BURST_FORWARD_DIST:
                 return 'forward_burst'
             return 'forward'
         else:
+            # Action!
             if marker_id % 2 != 0: return 'action_turn_left'
             else:                  return 'action_turn_right'
 
@@ -361,16 +392,18 @@ class HybridTracker:
         cx, _ = target['center']
         dist = target['distance']
         
+        # Centering
         offset = cx - (self.frame_width // 2)
         if abs(offset) > CENTER_THRESHOLD:
             return 'left' if offset < 0 else 'right'
             
+        # Approach
         if dist > TARGET_DISTANCE: 
              if dist > BURST_FORWARD_DIST:
                  return 'forward_burst'
              return 'forward'
         else:
-            return 'stop'
+            return 'stop' # Reached target
 
 class RobotControllerWrapper:
     def __init__(self, robot):
@@ -380,6 +413,9 @@ class RobotControllerWrapper:
         self.is_moving = False
 
     def execute_command(self, command):
+        # Initial check if robot is None (Viz mode)
+        if self.robot is None: return False
+        
         if self.is_moving: return False
         
         current_time = time.time()
@@ -395,6 +431,7 @@ class RobotControllerWrapper:
         if command == 'forward':
             self.robot.move_forward(fast=True)
         elif command == 'forward_burst':
+            print(f">>> BURST FORWARD ({BURST_REPEAT}x) <<<")
             for _ in range(BURST_REPEAT):
                 self.robot.move_forward(fast=True)
                 time.sleep(0.1)
@@ -403,75 +440,48 @@ class RobotControllerWrapper:
         elif command == 'right':
             self.robot.turn_right()
         elif command == 'action_turn_left':
+            print(f">>> ODD MARKER -> LEFT BURST ({BURST_REPEAT}x) <<<")
             for _ in range(BURST_REPEAT):
                 self.robot.turn_left()
                 time.sleep(0.1)
         elif command == 'action_turn_right':
+            print(f">>> EVEN MARKER -> RIGHT BURST ({BURST_REPEAT}x) <<<")
             for _ in range(BURST_REPEAT):
                 self.robot.turn_right()
                 time.sleep(0.1)
         elif command == 'stop':
-             pass 
+             pass # Standby
 
         self.last_command_time = current_time
         self.current_command = command
         self.is_moving = False
         return True
 
-# [UPDATED VISUALIZE FUNCTION]
 def visualize(frame, target, detections, command, fps, mode, target_class, center_depth, camera_matrix=None, dist_coeffs=None):
     disp = frame.copy()
     h, w = disp.shape[:2]
-    cx = w // 2
-    cy = h // 2
+    cx0, cy0 = w // 2, h // 2
     
     # 1. VISUALIZE DEPTH (Crosshair & Value)
     # Draw crosshair at center
-    cv2.line(disp, (cx - 15, cy), (cx + 15, cy), (0, 0, 255), 2)
-    cv2.line(disp, (cx, cy - 15), (cx, cy + 15), (0, 0, 255), 2)
-    
+    def draw_crosshair(img, x, y, size=15, color=(0,0,255), weight=2):
+        cv2.line(img, (x - size, y), (x + size, y), color, weight)
+        cv2.line(img, (x, y - size), (x, y + size), color, weight)
+
+    draw_crosshair(disp, cx0, cy0)
+
     # Display Center Depth Value next to crosshair
     if center_depth:
-        depth_text = f"{center_depth:.2f}m"
-        cv2.putText(disp, depth_text, (cx + 20, cy + 20), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
+        depth_text = f"C-Dist: {center_depth:.2f}m"
+        cv2.putText(disp, depth_text, (cx0 + 20, cy0 + 20), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
     
-    # 2. VISUALIZE DETECT STATUS (Big Banner)
-    # Check if we found what we are looking for
-    is_detected = False
-    if mode == 'ARUCO':
-        aruco_dets = [d for d in detections if d['type'] == 'aruco']
-        if aruco_dets: is_detected = True
-    elif mode == 'YOLO':
-        yolo_dets = [d for d in detections if d['type'] == 'yolo']
-        if yolo_dets: is_detected = True
-
-    status_font = cv2.FONT_HERSHEY_SIMPLEX
-    if is_detected:
-        status_msg = "TARGET DETECTED"
-        bg_color = (0, 255, 0) # Green
-        text_color = (0, 0, 0) # Black
-    else:
-        status_msg = "SEARCHING..."
-        bg_color = (0, 0, 255) # Red
-        text_color = (255, 255, 255) # White
-
-    # Draw Banner at Top Center
-    text_size, _ = cv2.getTextSize(status_msg, status_font, 1.0, 2)
-    text_w, text_h = text_size
-    box_x = (w - text_w) // 2
-    box_y = 40
-    
-    # Background Box
-    cv2.rectangle(disp, (box_x - 10, box_y - text_h - 10), (box_x + text_w + 10, box_y + 10), bg_color, -1)
-    # Text
-    cv2.putText(disp, status_msg, (box_x, box_y), status_font, 1.0, text_color, 2)
-
-    # 3. Standard GUIDES
-    cv2.line(disp, (cx, 0), (cx, h), (255,255,255), 1)
-    cv2.line(disp, (cx-CENTER_THRESHOLD, 0), (cx-CENTER_THRESHOLD, h), (0,255,0), 1)
-    cv2.line(disp, (cx+CENTER_THRESHOLD, 0), (cx+CENTER_THRESHOLD, h), (0,255,0), 1)
-    cv2.line(disp, (cx-FOV_MARGIN, 0), (cx-FOV_MARGIN, h), (255,0,0), 1)
-    cv2.line(disp, (cx+FOV_MARGIN, 0), (cx+FOV_MARGIN, h), (255,0,0), 1)
+       
+    # 2. Guides
+    cv2.line(disp, (cx0, 0), (cx0, h), (255,255,255), 1)
+    cv2.line(disp, (cx0-CENTER_THRESHOLD, 0), (cx0-CENTER_THRESHOLD, h), (0,255,0), 1)
+    cv2.line(disp, (cx0+CENTER_THRESHOLD, 0), (cx0+CENTER_THRESHOLD, h), (0,255,0), 1)
+    cv2.line(disp, (cx0-FOV_MARGIN, 0), (cx0-FOV_MARGIN, h), (255,0,0), 1)
+    cv2.line(disp, (cx0+FOV_MARGIN, 0), (cx0+FOV_MARGIN, h), (255,0,0), 1)
     
     for d in detections:
         dist = d.get('distance')
@@ -482,23 +492,46 @@ def visualize(frame, target, detections, command, fps, mode, target_class, cente
             corners = d['corners'].reshape((-1, 1, 2))
             cv2.polylines(disp, [corners], True, color, 2)
             
-            if 'rvec' in d and 'tvec' in d and camera_matrix is not None and dist_coeffs is not None:
-                try:
-                    cv2.drawFrameAxes(disp, camera_matrix, dist_coeffs, d['rvec'], d['tvec'], 0.1)
-                except AttributeError:
-                    pass
-
+            # Text: ID and Distance
             text = f"ID:{d['id']}"
             if dist: text += f" {dist:.2f}m"
+            
+            # Draw text with check for contrast/visibility
             text_pos = (int(corners[0][0][0]), int(corners[0][0][1]-10))
             cv2.putText(disp, text, text_pos, cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0,0,0), 4) # Outline
             cv2.putText(disp, text, text_pos, cv2.FONT_HERSHEY_SIMPLEX, 0.7, color, 2)   # Text
+
+            # Draw Axis if available (Robustly)
+            if 'rvec' in d and 'tvec' in d and camera_matrix is not None and dist_coeffs is not None:
+                try:
+                    # Scale axis length based on marker size
+                    axis_len = MARKER_LENGTH * 0.75
+                    cv2.drawFrameAxes(disp, camera_matrix, dist_coeffs, d['rvec'], d['tvec'], axis_len)
+                except Exception:
+                    pass
 
         elif d['type'] == 'yolo':
             x1,y1,x2,y2 = d['bbox']
             cv2.rectangle(disp, (x1,y1), (x2,y2), color, 2)
             cv2.putText(disp, f"{d['class']} {dist:.2f}m" if dist else f"{d['class']}", 
                         (x1, y1-10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
+
+    # 3. HUD: Locked Target Info (Prominent)
+    # Shown if target is locked
+    if target and target.get('type') == 'aruco':
+        t_id = target['id']
+        t_dist = target['distance']
+        status_msg = f"LOCKED: ID {t_id} | DIST: {t_dist:.2f}m"
+        
+        # Center-Bottom box
+        fs = 1.0
+        th = 2
+        sz, _ = cv2.getTextSize(status_msg, cv2.FONT_HERSHEY_SIMPLEX, fs, th)
+        bx = (w - sz[0]) // 2
+        by = h - 60
+        
+        cv2.rectangle(disp, (bx-10, by-sz[1]-10), (bx+sz[0]+10, by+10), (0,0,0), -1)
+        cv2.putText(disp, status_msg, (bx, by), cv2.FONT_HERSHEY_SIMPLEX, fs, (0,255,0), th)
 
     # HUD Text Info (Bottom Left)
     cv2.putText(disp, f"MODE: {mode}", (10, h - 90), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 0), 2)
@@ -516,6 +549,7 @@ def main():
     print(" 3. YOLO Mode (Track Target)")
     print("====================================")
     
+    # User Input
     target_class = None
     while target_class is None:
         print("\nSelect Target Class for End Phase:")
@@ -529,16 +563,25 @@ def main():
             
     print(f"\n>>> Selected Target: {target_class} <<<\n")
 
+    # Init Robot (Check connection)
     print("Connecting to Robot...")
-    ctrl = DynamixelController(DEVICENAME, BAUDRATE)
-    if not ctrl.connect():
-        sys.exit(1)
-    robot = QuadrupedRobot(ctrl, LEG_IDS)
-    robot.enable_all_torque()
-    robot.initialize_pose()
-    time.sleep(1)
-    robot.stand_pose()
+    robot = None
+    try:
+        ctrl = DynamixelController(DEVICENAME, BAUDRATE)
+        if not ctrl.connect():
+            print("Failed to connect Dynamixel (Controller). Running in Viz-Only mode?")
+        else:
+            robot = QuadrupedRobot(ctrl, LEG_IDS)
+            robot.enable_all_torque()
+            robot.initialize_pose()
+            time.sleep(1)
+            robot.stand_pose()
+            print("Robot Initialized.")
+    except (ImportError, NameError) as e:
+        print(f"Robot Driver Error ({e}). Running in Viz-Only mode.")
+        robot = None
     
+    # Init Tracker
     tracker = HybridTracker(target_class)
     if not tracker.start():
         sys.exit(1)
@@ -552,15 +595,16 @@ def main():
         while True:
             frame_count += 1
             
-            # [UPDATED CALL] Receive center_depth
+            # Process Frame
             img, target, detections, command, center_depth = tracker.process_frame()
             
             if img is None: continue
             
+            # Control
             if robot_enabled and (frame_count % CONTROL_FRAME_INTERVAL == 0):
                 robot_ctrl.execute_command(command)
                 
-            # [UPDATED CALL] Pass center_depth to visualize
+            # Visualize
             disp = visualize(img, target, detections, command, tracker.current_fps, tracker.mode, tracker.target_class, center_depth, tracker.camera_matrix, tracker.dist_coeffs)
             
             status_text = "ENABLED" if robot_enabled else "DISABLED"
@@ -580,8 +624,9 @@ def main():
     finally:
         tracker.stop()
         cv2.destroyAllWindows()
-        robot.disable_all_torque()
-        ctrl.disconnect()
+        if robot:
+            robot.disable_all_torque()
+            ctrl.disconnect()
 
 if __name__ == "__main__":
     main()

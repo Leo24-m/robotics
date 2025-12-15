@@ -89,6 +89,7 @@ class HybridTracker:
         self.state_timer = 0
         self.turn_duration = 2.0  # Seconds to allow for turn
         self.move_after_turn_duration = 2.0 # Seconds to move forward after turn
+        self.initial_scan_done = False # [NEW] Restrict initial search to 1 or 2
 
 
     def _load_model(self):
@@ -179,11 +180,18 @@ class HybridTracker:
             for i, marker_id in enumerate(ids):
                 c = corners[i][0]
                 cx, cy = int(np.mean(c[:, 0])), int(np.mean(c[:, 1]))
-                dist = self.get_distance_at_point(depth_frame, cx, cy)
                 
                 # Safe access to rvec/tvec
                 rv = rvecs[i] if self.camera_matrix is not None else None
                 tv = tvecs[i] if self.camera_matrix is not None else None
+                
+                # Use tvec for distance if available (more robust than single pixel depth)
+                if tv is not None:
+                    # tvec is [x, y, z]. Distance is norm or just z.
+                    # tv shape is (1,3) usually
+                    dist = np.linalg.norm(tv)
+                else:
+                    dist = self.get_distance_at_point(depth_frame, cx, cy)
                 
                 detections.append({
                     'type': 'aruco',
@@ -273,10 +281,23 @@ class HybridTracker:
             if self.nav_state == 'SEARCHING':
                 # Strategy: Rotate Left until Marker 1 or 2 is found (or any valid 1-8)
                 # Filter out 9, check distance based on MAX, AND CHECK FOV
-                valid_markers = [d for d in detections if d['id'] != 9 and d['distance'] is not None and d['distance'] < MAX_DISTANCE and is_in_fov(d)]
+                # valid_markers = [d for d in detections if d['id'] != 9 and d['distance'] is not None and d['distance'] < MAX_DISTANCE and is_in_fov(d)]
+                
+                valid_markers = []
+                for d in detections:
+                    if d['id'] == 9: continue
+                    if d['distance'] is None or d['distance'] >= MAX_DISTANCE: continue
+                    if not is_in_fov(d): continue
+                    
+                    # Initial Search Restriction: Only look for 1 or 2 first
+                    if not self.initial_scan_done:
+                        if d['id'] not in [1, 2]: continue
+                        
+                    valid_markers.append(d)
                 
                 if valid_markers:
                     # Found a marker!
+                    self.initial_scan_done = True
                     target = min(valid_markers, key=lambda d: d['distance'])
                     self.current_marker_id = target['id']
                     self.nav_state = 'APPROACHING'

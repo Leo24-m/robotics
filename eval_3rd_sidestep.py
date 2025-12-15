@@ -302,12 +302,14 @@ class HybridEvaluator:
                     command = 'stop'
                 else:
                     # Alignment Check during Sidestep (User Allow: "Rotation matches vertical")
+                    # PRIORITIZE SIDESTEP using wider threshold (120) instead of strict 80
                     old_target = next((d for d in aruco_dets if d['id'] == self.buffered_id), None)
                     if old_target:
                          cx = old_target['center'][0]
-                         if abs(cx - 320) > CENTER_THRESHOLD:
+                         # 320 +/- 120 = [200, 440] - Keep it roughly in view, but allow drift
+                         if abs(cx - 320) > 120:
                              command = 'left' if (cx < 320) else 'right'
-                             print(f"[STATE] Aligning Old ID {self.buffered_id} during Sidestep.")
+                             print(f"[STATE] Aligning Old ID {self.buffered_id} (Drifted).")
                          else:
                              command = sidestep_cmd
                     else:
@@ -317,9 +319,9 @@ class HybridEvaluator:
                 old_target = next((d for d in aruco_dets if d['id'] == self.buffered_id), None)
                 if old_target:
                      cx = old_target['center'][0]
-                     if abs(cx - 320) > CENTER_THRESHOLD:
+                     if abs(cx - 320) > 120:
                          command = 'left' if (cx < 320) else 'right'
-                         print(f"[STATE] Aligning Old ID {self.buffered_id} during Sidestep.")
+                         print(f"[STATE] Aligning Old ID {self.buffered_id} (Drifted).")
                      else:
                          command = sidestep_cmd
                 else:

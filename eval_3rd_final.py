@@ -44,7 +44,7 @@ YOLO_MODEL_PATH = "yolov8n.pt"
 # Navigation Params
 FOV_MARGIN = 160           # Center locking margin
 CENTER_THRESHOLD = 80      # Forward alignment
-APPROACH_STOP_DIST = 0.18  # Stop ArUco approach at 18cm [UPDATED]
+APPROACH_STOP_DIST = 0.30  # Stop ArUco approach at 18cm [UPDATED]
 M9_CHECK_DIST = 1.20       # Stop at 1.2m for YOLO check
 TURN_WAIT_TIME = 2.0       # Wait after turn
 

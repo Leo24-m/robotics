@@ -99,7 +99,7 @@ class HybridEvaluator:
         
         # ArUco Detection Buffer (5 frames)
         self.aruco_history = {}  # {marker_id: [list of last 5 detections]}
-        self.ARUCO_BUFFER_SIZE = 5
+        self.ARUCO_BUFFER_SIZE = 2
         
         # Performance
         self.last_frame_time = time.time()
@@ -315,7 +315,7 @@ class HybridEvaluator:
             else:
                 # Persistence
                 if self.approach_lost_time is None: self.approach_lost_time = curr_time
-                if curr_time - self.approach_lost_time > 1.0:
+                if curr_time - self.approach_lost_time > 3.0:
                     print(f"[STATE] Lost ID {self.buffered_id}. Back to SEARCH.")
                     self.state = 'SEARCHING'
                     self.approach_lost_time = None

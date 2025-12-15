@@ -391,20 +391,20 @@ class GaitPatterns:
                       3(BL)---2(BR)  (뒤)
         
         오른쪽 이동 시: 1,2(앞) --- 4,3(뒤)
-        move_forward를 반시계 회전: 4→1, 3→2, 1→4, 2→3
+        move_forward를 반시계 회전: 다리번호 1→4, 2→3, 3→2, 4→1
         
         forward: 2,4 들기 / 1,3 들기
-        right:   2,4 들기 / 1,3 들기 (동일!)
+        right:   3,1 들기 / 4,2 들기 (회전된 대각선)
         """
         return [
-            # Step 1: 다리 2,4 들기 (대각선 - forward와 동일)
+            # Step 1: 다리 3,1 들기 (대각선 - 뒤3 + 앞1)
             GaitStep(
                 movements={
-                    2: Poses.WALK_RIGHT_INTERM_A,  # Back-Right (앞다리)
-                    4: Poses.WALK_RIGHT_INTERM_A,  # Front-Left (뒷다리)
+                    3: Poses.WALK_RIGHT_INTERM_A,  # Back-Left (뒷다리)
+                    1: Poses.WALK_RIGHT_INTERM_A,  # Front-Right (앞다리)
                 },
                 duration_type='return',
-                description="Lift legs 2,4 (diagonal pair)"
+                description="Lift legs 3,1 (diagonal pair)"
             ),
             
             # Step 2: Power stroke
@@ -419,14 +419,14 @@ class GaitPatterns:
                 description="Power stroke - all legs push right"
             ),
             
-            # Step 3: 다리 1,3 들기 (대각선 - forward와 동일)
+            # Step 3: 다리 4,2 들기 (대각선 - 뒤4 + 앞2)
             GaitStep(
                 movements={
-                    1: Poses.WALK_RIGHT_INTERM_B,  # Front-Right (앞다리)
-                    3: Poses.WALK_RIGHT_INTERM_B,  # Back-Left (뒷다리)
+                    4: Poses.WALK_RIGHT_INTERM_B,  # Front-Left (뒷다리)
+                    2: Poses.WALK_RIGHT_INTERM_B,  # Back-Right (앞다리)
                 },
                 duration_type='return',
-                description="Lift legs 1,3 (diagonal pair)"
+                description="Lift legs 4,2 (diagonal pair)"
             ),
             
             # Step 4: Return stroke

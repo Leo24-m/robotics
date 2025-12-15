@@ -95,6 +95,7 @@ class HybridEvaluator:
         self.buffered_id = None
         self.initial_scan_done = False
         self.approach_lost_time = None
+        self.last_known_distance = None  # Track last distance for lost-marker handling
         self.yolo_action_counter = 0  # Counter for YOLO detection interval
         
         # ArUco Detection Buffer (5 frames)
@@ -299,6 +300,7 @@ class HybridEvaluator:
             
             if target:
                 self.approach_lost_time = None
+                self.last_known_distance = target['distance']  # Track distance
                 target_info = target
                 dist = target['distance']
                 cx = target['center'][0]
@@ -313,15 +315,24 @@ class HybridEvaluator:
                     else:
                          command = 'forward'
             else:
-                # Persistence
-                if self.approach_lost_time is None: self.approach_lost_time = curr_time
-                if curr_time - self.approach_lost_time > 3.0:
-                    print(f"[STATE] Lost ID {self.buffered_id}. Back to SEARCH.")
-                    self.state = 'SEARCHING'
-                    self.approach_lost_time = None
-                    command = 'stop'
+                # Lost marker - Check last known distance
+                if self.last_known_distance is not None and 0.6 <= self.last_known_distance <= 0.9:
+                    # Close enough, move forward once and start sidestep
+                    print(f"[STATE] Lost ID {self.buffered_id} at close range ({self.last_known_distance:.2f}m). Forward + Sidestep.")
+                    self.state = 'ACTION_SIDESTEP'
+                    self.last_known_distance = None
+                    command = 'forward'  # Move forward once before sidestep
                 else:
-                    command = 'stop'
+                    # Persistence
+                    if self.approach_lost_time is None: self.approach_lost_time = curr_time
+                    if curr_time - self.approach_lost_time > 1.0:
+                        print(f"[STATE] Lost ID {self.buffered_id}. Back to SEARCH.")
+                        self.state = 'SEARCHING'
+                        self.approach_lost_time = None
+                        self.last_known_distance = None
+                        command = 'stop'
+                    else:
+                        command = 'stop'
 
         elif self.state == 'ACTION_SIDESTEP':
             # Determine direction based on buffered_id

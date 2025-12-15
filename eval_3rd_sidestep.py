@@ -22,7 +22,7 @@ from ultralytics import YOLO
 # --- IMPORT ROBOT MODULES ---
 try:
     # Changed to v2 as requested
-    from eval_2nd_modi_v2 import DynamixelController, QuadrupedRobot, LEG_IDS, DEVICENAME, BAUDRATE
+    from eval_2nd_modi_v2 import DynamixelController, QuadrupedRobot, LEG_IDS, DEVICENAME, BAUDRATE, GaitSpeed
 except ImportError:
     print("Error: eval_2nd_modi_v2.py not found. Robot control will fail.")
     sys.exit(1)
@@ -400,7 +400,7 @@ def main():
             if img is None: continue
             
             if robot_active:
-                if cmd == 'forward': robot.move_forward(fast=True)
+                if cmd == 'forward': robot.move_forward(speed=GaitSpeed.FAST)
                 elif cmd == 'left': robot.turn_left()
                 elif cmd == 'right': robot.turn_right()
                 elif cmd == 'sidestep_left': robot.sidestep_left()

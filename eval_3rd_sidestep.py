@@ -417,7 +417,7 @@ class HybridEvaluator:
                     command = 'stop'
             else:
                 print("[STATE] M9 Lost. Searching...")
-                command = 'left'
+                command = 'right'
 
         elif self.state == 'YOLO_TRACKING':
             if not self.model_ready:

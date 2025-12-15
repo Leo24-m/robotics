@@ -43,7 +43,7 @@ YOLO_MODEL_PATH = "yolov8n.pt"
 # Navigation Params
 FOV_MARGIN = 160           # Center locking margin
 CENTER_THRESHOLD = 80      # Forward alignment
-APPROACH_STOP_DIST = 0.40  # Stop ArUco approach at 18cm [UPDATED]
+APPROACH_STOP_DIST = 0.40  # Stop ArUco approach at 40cm [UPDATED]
 M9_CHECK_DIST = 1.20       # Stop at 1.2m for YOLO check
 TURN_WAIT_TIME = 2.0       # Wait after turn
 
@@ -117,6 +117,7 @@ class HybridEvaluator:
         self.buffered_id = None  # ID of the marker we are currently locked onto
         self.state_timer = 0.0
         self.initial_scan_done = False # [NEW] flag
+        self.approach_lost_time = None # Persistence timer for APPROACHING
         
         # Performance
         self.last_frame_time = time.time()
@@ -322,6 +323,9 @@ class HybridEvaluator:
                  return img, all_dets, 'stop', self.state, m9
 
             if target:
+                # Target found - Reset lost timer
+                self.approach_lost_time = None
+                
                 target_info = target
                 # Check Distance
                 dist = target['distance']
@@ -330,7 +334,7 @@ class HybridEvaluator:
                 # Check if reached goal
                 if dist <= APPROACH_STOP_DIST:
                     self.state = 'ACTION'
-                    self.action_counter = 0
+                    # action_counter not used in new logic
                     print(f"[STATE] Reached ID {self.buffered_id} ({dist:.2f}m). Starting Turn Action.")
                     command = 'stop'
                 else:
@@ -340,9 +344,21 @@ class HybridEvaluator:
                     else:
                          command = 'forward'
             else:
-                # Lost target?
-                print(f"[STATE] Lost Buffer ID {self.buffered_id}. Back to SEARCH.")
-                self.state = 'SEARCHING'
+                # Target lost - Check persistence
+                if self.approach_lost_time is None:
+                    self.approach_lost_time = curr_time
+                
+                elapsed_lost = curr_time - self.approach_lost_time
+                if elapsed_lost > 1.0:
+                    # Lost for too long -> Back to SEARCH
+                    print(f"[STATE] Lost Buffer ID {self.buffered_id} for {elapsed_lost:.1f}s. Back to SEARCH.")
+                    self.state = 'SEARCHING'
+                    self.approach_lost_time = None
+                    command = 'stop'
+                else:
+                    # Wait/Persist (Stop moving to be safe)
+                    print(f"[STATE] Lost Buffer ID {self.buffered_id} (Persisting {elapsed_lost:.1f}s)...")
+                    command = 'stop'
 
         elif self.state == 'ACTION':
             # Execute turns based on ID (Odd=Left, Even=Right)

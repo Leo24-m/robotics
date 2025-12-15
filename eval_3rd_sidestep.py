@@ -201,7 +201,7 @@ class HybridEvaluator:
         
         img = np.asanyarray(c_frame.get_data())
         raw_aruco_dets = self.detect_aruco(img, d_frame)  # Raw detections
-        yolo_dets = []
+
         
         # --- ArUco 5-Frame Buffering ---
         # 1. Update history with current frame detections
@@ -245,11 +245,12 @@ class HybridEvaluator:
                 })
         
         # Run YOLO only if in YOLO tracking state
+        yolo_dets = []  
         if self.state == 'YOLO_TRACKING' and self.model_ready:
-            self.yolo_action_counter += 1
-            if self.yolo_action_counter >= 3:
-                yolo_dets = self.detect_yolo(img)  # 3프레임째만 실행
-                self.yolo_action_counter = 0
+              self.yolo_action_counter += 1
+              if self.yolo_action_counter >= 3:
+                  yolo_dets = self.detect_yolo(img)  # 3프레임째만 실행
+                  self.yolo_action_counter = 0
             
         all_dets = aruco_dets + yolo_dets
         command = 'stop'
@@ -416,9 +417,7 @@ class HybridEvaluator:
             if not self.model_ready:
                 print("Waiting for YOLO...")
                 command = 'stop'
-            elif yolo_dets:
-                # Run YOLO detection this action
-                self.yolo_action_counter = 0  # Reset
+            elif yolo_dets: # 3프레임째
                 found = next((d for d in yolo_dets if d['class'] == self.target_class), None)
                 if found:
                     cx = found['center'][0]
@@ -430,7 +429,7 @@ class HybridEvaluator:
                 else:
                      print(f"[STATE] YOLO Target {self.target_class} Not Found. Scanning...")
                      command = 'right'
-            else:
+            else: # 1~2 프레임째
                 # Non-YOLO action: Just move forward blindly or maintain last command
                 print(f"[STATE] YOLO_TRACKING (Action {self.yolo_action_counter}/3). Moving forward.")
                 command = 'forward' # Default scan?

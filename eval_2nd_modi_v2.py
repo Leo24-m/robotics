@@ -406,10 +406,10 @@ class GaitPatterns:
             # Step 2: Power stroke
             GaitStep(
                 movements={
-                    2: Poses.WALK_RIGHT_POS_2,  # 다리2 = forward의 다리3 역할
-                    1: Poses.WALK_RIGHT_POS_1,  # 다리1 = forward의 다리4 역할
-                    3: Poses.WALK_RIGHT_POS_3,  # 다리3 = forward의 다리2 역할
-                    4: Poses.WALK_RIGHT_POS_4,  # 다리4 = forward의 다리1 역할
+                    2: Poses.FORWARD_POS_13,
+                    3: Poses.FORWARD_POS_11,
+                    4: Poses.FORWARD_POS_14,
+                    1: Poses.FORWARD_POS_12,
                 },
                 duration_type='power',
                 description="Power stroke - all legs push right"
@@ -418,8 +418,8 @@ class GaitPatterns:
             # Step 3: 다리 4,2 들기 (대각선 - 뒤4 + 앞2)
             GaitStep(
                 movements={
-                    4: Poses.FORWARD_INTERM_B,  # Front-Left (뒷다리)
-                    2: Poses.FORWARD_INTERM_B,  # Back-Right (앞다리)
+                    2: Poses.FORWARD_INTERM_B,  # Front-Left (뒷다리)
+                    4: Poses.FORWARD_INTERM_B,  # Back-Right (앞다리)
                 },
                 duration_type='return',
                 description="Lift legs 4,2 (diagonal pair)"
@@ -428,10 +428,10 @@ class GaitPatterns:
             # Step 4: Return stroke
             GaitStep(
                 movements={
-                    2: Poses.WALK_RIGHT_BACK_2,  # 다리2
-                    1: Poses.WALK_RIGHT_BACK_1,  # 다리1
-                    3: Poses.WALK_RIGHT_BACK_3,  # 다리3
-                    4: Poses.WALK_RIGHT_BACK_4,  # 다리4
+                    2: Poses.BACKWARD_POS_13,
+                    3: Poses.BACKWARD_POS_11,
+                    4: Poses.BACKWARD_POS_14,
+                    1: Poses.BACKWARD_POS_12,
                 },
                 duration_type='power',
                 description="Return stroke - complete cycle"

@@ -97,6 +97,10 @@ class HybridEvaluator:
         self.approach_lost_time = None
         self.yolo_action_counter = 0  # Counter for YOLO detection interval
         
+        # ArUco Detection Buffer (5 frames)
+        self.aruco_history = {}  # {marker_id: [list of last 5 detections]}
+        self.ARUCO_BUFFER_SIZE = 5
+        
         # Performance
         self.last_frame_time = time.time()
         self.fps = 0.0
@@ -195,8 +199,49 @@ class HybridEvaluator:
         if not c_frame: return None, None, 'none', self.state, None
         
         img = np.asanyarray(c_frame.get_data())
-        aruco_dets = self.detect_aruco(img, d_frame)
+        raw_aruco_dets = self.detect_aruco(img, d_frame)  # Raw detections
         yolo_dets = []
+        
+        # --- ArUco 5-Frame Buffering ---
+        # 1. Update history with current frame detections
+        current_ids = set()
+        for det in raw_aruco_dets:
+            mid = det['id']
+            current_ids.add(mid)
+            if mid not in self.aruco_history:
+                self.aruco_history[mid] = []
+            self.aruco_history[mid].append(det)
+            # Keep only last N frames
+            if len(self.aruco_history[mid]) > self.ARUCO_BUFFER_SIZE:
+                self.aruco_history[mid].pop(0)
+        
+        # 2. Remove stale markers (not seen this frame)
+        stale_ids = [mid for mid in self.aruco_history if mid not in current_ids]
+        for mid in stale_ids:
+            # Decay: Remove oldest entry
+            if self.aruco_history[mid]:
+                self.aruco_history[mid].pop(0)
+            if not self.aruco_history[mid]:
+                del self.aruco_history[mid]
+        
+        # 3. Build stable detections (seen >= 5 frames)
+        aruco_dets = []
+        for mid, history in self.aruco_history.items():
+            if len(history) >= self.ARUCO_BUFFER_SIZE:
+                # Average the values
+                avg_dist = np.mean([h['distance'] for h in history])
+                avg_cx = int(np.mean([h['center'][0] for h in history]))
+                avg_cy = int(np.mean([h['center'][1] for h in history]))
+                # Use latest corners/tvec for visualization
+                latest = history[-1]
+                aruco_dets.append({
+                    'type': 'aruco',
+                    'id': mid,
+                    'corners': latest['corners'],
+                    'center': (avg_cx, avg_cy),
+                    'distance': avg_dist,
+                    'tvec': latest['tvec']
+                })
         
         # Run YOLO only if in YOLO tracking state
         if self.state == 'YOLO_TRACKING' and self.model_ready:

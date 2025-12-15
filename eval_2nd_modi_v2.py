@@ -330,17 +330,20 @@ class GaitPatterns:
                       3(BL)---2(BR)  (뒤)
         
         왼쪽 이동 시:  4,3(앞) --- 1,2(뒤)
-        move_forward의 1→4, 4→3, 2→1, 3→2로 매핑
+        move_forward의 Trot 패턴 유지 (대각선으로 들기)
+        
+        forward: 2,4 들기 / 1,3 들기
+        left:    1,3 들기 / 2,4 들기  (역순)
         """
         return [
-            # Step 1: 다리 4,3 들기 (왼쪽 다리 = 앞다리 역할)
+            # Step 1: 다리 1,3 들기 (대각선 - forward의 2,4에 해당)
             GaitStep(
                 movements={
-                    4: Poses.WALK_LEFT_INTERM_A,  # Front-Left
+                    1: Poses.WALK_LEFT_INTERM_A,  # Front-Right
                     3: Poses.WALK_LEFT_INTERM_A,  # Back-Left
                 },
                 duration_type='return',
-                description="Lift legs 4,3 - leading legs for left walk"
+                description="Lift legs 1,3 (diagonal pair)"
             ),
             
             # Step 2: Power stroke - 모든 다리 동시 이동
@@ -355,14 +358,14 @@ class GaitPatterns:
                 description="Power stroke - all legs push left"
             ),
             
-            # Step 3: 다리 1,2 들기 (오른쪽 다리 = 뒷다리 역할)
+            # Step 3: 다리 2,4 들기 (대각선 - forward의 1,3에 해당)
             GaitStep(
                 movements={
-                    1: Poses.WALK_LEFT_INTERM_B,  # Front-Right
                     2: Poses.WALK_LEFT_INTERM_B,  # Back-Right
+                    4: Poses.WALK_LEFT_INTERM_B,  # Front-Left
                 },
                 duration_type='return',
-                description="Lift legs 1,2 - following legs"
+                description="Lift legs 2,4 (diagonal pair)"
             ),
             
             # Step 4: Return stroke - 모든 다리 복귀
@@ -388,17 +391,20 @@ class GaitPatterns:
                       3(BL)---2(BR)  (뒤)
         
         오른쪽 이동 시: 1,2(앞) --- 4,3(뒤)
-        move_forward의 1→1, 4→2, 2→4, 3→3으로 매핑
+        move_forward의 Trot 패턴 유지 (대각선으로 들기)
+        
+        forward: 2,4 들기 / 1,3 들기
+        right:   3,4 들기 / 1,2 들기  (변환)
         """
         return [
-            # Step 1: 다리 1,2 들기 (오른쪽 다리 = 앞다리 역할)
+            # Step 1: 다리 3,4 들기 (대각선 - forward의 2,4에 해당)
             GaitStep(
                 movements={
-                    1: Poses.WALK_RIGHT_INTERM_A,  # Front-Right
-                    2: Poses.WALK_RIGHT_INTERM_A,  # Back-Right
+                    3: Poses.WALK_RIGHT_INTERM_A,  # Back-Left
+                    4: Poses.WALK_RIGHT_INTERM_A,  # Front-Left
                 },
                 duration_type='return',
-                description="Lift legs 1,2 - leading legs for right walk"
+                description="Lift legs 3,4 (diagonal pair)"
             ),
             
             # Step 2: Power stroke
@@ -413,14 +419,14 @@ class GaitPatterns:
                 description="Power stroke - all legs push right"
             ),
             
-            # Step 3: 다리 4,3 들기 (왼쪽 다리 = 뒷다리 역할)
+            # Step 3: 다리 1,2 들기 (대각선 - forward의 1,3에 해당)
             GaitStep(
                 movements={
-                    4: Poses.WALK_RIGHT_INTERM_B,  # Front-Left
-                    3: Poses.WALK_RIGHT_INTERM_B,  # Back-Left
+                    1: Poses.WALK_RIGHT_INTERM_B,  # Front-Right
+                    2: Poses.WALK_RIGHT_INTERM_B,  # Back-Right
                 },
                 duration_type='return',
-                description="Lift legs 4,3 - following legs"
+                description="Lift legs 1,2 (diagonal pair)"
             ),
             
             # Step 4: Return stroke

@@ -18,7 +18,7 @@ except ImportError:
 
 # 통신 설정
 BAUDRATE = 57600
-DEVICENAME = '/dev/ttyACM0'  # e.g. 'COM5' on Windows, '/dev/ttyUSB0' on Linux
+DEVICENAME = '/dev/ttyUSB0'  # e.g. 'COM5' on Windows, '/dev/ttyUSB0' on Linux
 PROTOCOL_VERSION = 2.0
 
 # 모터 주소 (Protocol 2.0)

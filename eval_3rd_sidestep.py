@@ -246,7 +246,10 @@ class HybridEvaluator:
         
         # Run YOLO only if in YOLO tracking state
         if self.state == 'YOLO_TRACKING' and self.model_ready:
-             yolo_dets = self.detect_yolo(img) 
+            self.yolo_action_counter += 1
+            if self.yolo_action_counter >= 3:
+                yolo_dets = self.detect_yolo(img)  # 3프레임째만 실행
+                self.yolo_action_counter = 0
             
         all_dets = aruco_dets + yolo_dets
         command = 'stop'
@@ -410,13 +413,10 @@ class HybridEvaluator:
                 command = 'left'
 
         elif self.state == 'YOLO_TRACKING':
-            # YOLO Detection every 3 actions
-            self.yolo_action_counter += 1
-            
             if not self.model_ready:
                 print("Waiting for YOLO...")
                 command = 'stop'
-            elif self.yolo_action_counter >= 3:
+            elif yolo_dets:
                 # Run YOLO detection this action
                 self.yolo_action_counter = 0  # Reset
                 found = next((d for d in yolo_dets if d['class'] == self.target_class), None)

@@ -301,9 +301,29 @@ class HybridEvaluator:
                     print(f"[STATE] Found NEW ID {self.buffered_id}. APPROACHING.")
                     command = 'stop'
                 else:
-                    command = sidestep_cmd
+                    # Alignment Check during Sidestep (User Allow: "Rotation matches vertical")
+                    old_target = next((d for d in aruco_dets if d['id'] == self.buffered_id), None)
+                    if old_target:
+                         cx = old_target['center'][0]
+                         if abs(cx - 320) > CENTER_THRESHOLD:
+                             command = 'left' if (cx < 320) else 'right'
+                             print(f"[STATE] Aligning Old ID {self.buffered_id} during Sidestep.")
+                         else:
+                             command = sidestep_cmd
+                    else:
+                        command = sidestep_cmd
             else:
-                command = sidestep_cmd
+                 # Alignment Check during Sidestep
+                old_target = next((d for d in aruco_dets if d['id'] == self.buffered_id), None)
+                if old_target:
+                     cx = old_target['center'][0]
+                     if abs(cx - 320) > CENTER_THRESHOLD:
+                         command = 'left' if (cx < 320) else 'right'
+                         print(f"[STATE] Aligning Old ID {self.buffered_id} during Sidestep.")
+                     else:
+                         command = sidestep_cmd
+                else:
+                    command = sidestep_cmd
 
         elif self.state == 'M9_CENTERING':
             # Approach/Center M9 until it is centered and close enough?

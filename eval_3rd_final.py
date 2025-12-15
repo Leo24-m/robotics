@@ -44,7 +44,7 @@ YOLO_MODEL_PATH = "yolov8n.pt"
 # Navigation Params
 FOV_MARGIN = 160           # Center locking margin
 CENTER_THRESHOLD = 80      # Forward alignment
-APPROACH_STOP_DIST = 0.18  # Stop ArUco approach at 18cm [UPDATED]
+APPROACH_STOP_DIST = 0.40  # Stop ArUco approach at 40cm [UPDATED]
 M9_CHECK_DIST = 1.20       # Stop at 1.2m for YOLO check
 TURN_WAIT_TIME = 2.0       # Wait after turn
 
@@ -344,26 +344,44 @@ class HybridEvaluator:
                 # Lost target?
                 print(f"[STATE] Lost Buffer ID {self.buffered_id}. Back to SEARCH.")
                 self.state = 'SEARCHING'
-                command = 'stop'
 
         elif self.state == 'ACTION':
             # Execute turns based on ID (Odd=Left, Even=Right)
             is_odd = (self.buffered_id % 2 != 0)
             target_cmd = 'action_turn_left' if is_odd else 'action_turn_right'
             
-            if self.action_counter < self.turn_repeat:
-                command = target_cmd
-                self.action_counter += 1
-                # Note: Robot wrapper executes 'action_*' as a burst or single step?
-                # We will handle perform wait in wrapper or here?
-                # Ideally, command should be single step, wrapper handles it. 
-                # Let's assume wrapper executes one full turn step.
+            # Logic: Turn untill a NEW marker (not buffered_id) is found.
+            # 1. Search for potential new markers
+            new_candidates = [d for d in aruco_dets if d['id'] != self.buffered_id]
+            
+            # Filter out Marker 9 separately? 
+            # If we see 9, we should probably handle it via the SEARCH/APPROACH override logic, 
+            # but let's handle it here for smoothness.
+            
+            m9 = next((d for d in new_candidates if d['id'] == 9), None)
+            if m9:
+                 self.buffered_id = 9
+                 self.state = 'M9_APPROACH'
+                 print(f"[STATE] Found ID 9 during ACTION! Switching to M9_APPROACH.")
+                 return img, all_dets, 'stop', self.state, m9
+            
+            if new_candidates:
+                # Found a new marker!
+                target = min(new_candidates, key=lambda x: x['distance'])
+                
+                # Check if it's "stable"? (Distance < 3.0m). 
+                if target['distance'] < 3.0:
+                    self.buffered_id = target['id']
+                    self.state = 'APPROACHING'
+                    self.action_counter = 0 # reset
+                    print(f"[STATE] Found NEW ID {self.buffered_id}. Stopping Turn. APPROACHING.")
+                    command = 'stop'
+                else:
+                    # Too far, keep turning
+                     command = target_cmd
             else:
-                # Done turning
-                print(f"[STATE] Action Complete. Back to SEARCH.")
-                self.state = 'SEARCHING'
-                self.buffered_id = None
-                command = 'stop'
+                # No new marker, keep turning
+                command = target_cmd
 
         elif self.state == 'M9_APPROACH':
             target = next((d for d in aruco_dets if d['id'] == 9), None)

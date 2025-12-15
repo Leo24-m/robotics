@@ -69,11 +69,13 @@ class HybridEvaluator:
         # RealSense
         self.pipeline = rs.pipeline()
         self.config = rs.config()
-        self.config.enable_stream(rs.stream.color, 640, 480, rs.format.bgr8, 30)
-        self.config.enable_stream(rs.stream.depth, 640, 480, rs.format.z16, 30)
+        # self.config.enable_stream(rs.stream.color, 640, 480, rs.format.bgr8, 30)
+        # self.config.enable_stream(rs.stream.depth, 640, 480, rs.format.z16, 30)
+        self.config.enable_stream(rs.stream.color, 1280, 720, rs.format.bgr8, 30)
+        self.config.enable_stream(rs.stream.depth, 1280, 720, rs.format.z16, 30)
         self.align = rs.align(rs.stream.color)
-        self.frame_width = 640
-        self.frame_height = 480
+        self.frame_width = 1280
+        self.frame_height = 720
         
         # Intrinsics
         self.camera_matrix = None
@@ -314,8 +316,9 @@ class HybridEvaluator:
                     print(f"[STATE] Reached ID {self.buffered_id} ({dist:.2f}m). Starting Sidestep.")
                     command = 'stop'
                 else:
-                    if abs(cx - 320) > CENTER_THRESHOLD:
-                         command = 'left' if (cx < 320) else 'right'
+                    center_x = self.frame_width // 2
+                    if abs(cx - center_x) > CENTER_THRESHOLD:
+                         command = 'left' if (cx < center_x) else 'right'
                     else:
                          command = 'forward'
             else:
@@ -367,9 +370,10 @@ class HybridEvaluator:
                     old_target = next((d for d in aruco_dets if d['id'] == self.buffered_id), None)
                     if old_target:
                          cx = old_target['center'][0]
-                         # 320 +/- 120 = [200, 440] - Keep it roughly in view, but allow drift
-                         if abs(cx - 320) > 120:
-                             command = 'left' if (cx < 320) else 'right'
+                         center_x = self.frame_width // 2
+                         # center_x +/- 120 - Keep it roughly in view, but allow drift
+                         if abs(cx - center_x) > 120:
+                             command = 'left' if (cx < center_x) else 'right'
                              print(f"[STATE] Aligning Old ID {self.buffered_id} (Drifted).")
                          else:
                              command = sidestep_cmd
@@ -380,8 +384,9 @@ class HybridEvaluator:
                 old_target = next((d for d in aruco_dets if d['id'] == self.buffered_id), None)
                 if old_target:
                      cx = old_target['center'][0]
-                     if abs(cx - 320) > 120:
-                         command = 'left' if (cx < 320) else 'right'
+                     center_x = self.frame_width // 2
+                     if abs(cx - center_x) > 120:
+                         command = 'left' if (cx < center_x) else 'right'
                          print(f"[STATE] Aligning Old ID {self.buffered_id} (Drifted).")
                      else:
                          command = sidestep_cmd
@@ -397,8 +402,9 @@ class HybridEvaluator:
                 dist = target['distance']
                 
                 # First: Center the marker
-                if abs(cx - 320) > CENTER_THRESHOLD:
-                    command = 'left' if (cx < 320) else 'right'
+                center_x = self.frame_width // 2
+                if abs(cx - center_x) > CENTER_THRESHOLD:
+                    command = 'left' if (cx < center_x) else 'right'
                 # Then: Check distance
                 elif dist > M9_CHECK_DIST:
                     # Still far, keep approaching
@@ -421,9 +427,10 @@ class HybridEvaluator:
                 found = next((d for d in yolo_dets if d['class'] == self.target_class), None)
                 if found:
                     cx = found['center'][0]
+                    center_x = self.frame_width // 2
                     print(f"[STATE] YOLO Found {self.target_class} at {cx}")
-                    if abs(cx - 320) > CENTER_THRESHOLD:
-                        command = 'left' if (cx < 320) else 'right'
+                    if abs(cx - center_x) > CENTER_THRESHOLD:
+                        command = 'left' if (cx < center_x) else 'right'
                     else:
                         command = 'forward'
                 else:
@@ -439,8 +446,9 @@ class HybridEvaluator:
 def visualize_hud(img, state, command, fps, dets, target_info, target_class):
     disp = img.copy()
     h, w = disp.shape[:2]
-    cv2.line(disp, (320, 220), (320, 260), (0,0,255), 2)
-    cv2.line(disp, (300, 240), (340, 240), (0,0,255), 2)
+    center_x, center_y = w // 2, h // 2
+    cv2.line(disp, (center_x, center_y - 20), (center_x, center_y + 20), (0,0,255), 2)
+    cv2.line(disp, (center_x - 20, center_y), (center_x + 20, center_y), (0,0,255), 2)
     
     for d in dets:
         if d['type'] == 'aruco':

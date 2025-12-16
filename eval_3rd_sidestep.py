@@ -99,6 +99,7 @@ class HybridEvaluator:
         self.approach_lost_time = None
         self.last_known_distance = None  # Track last distance for lost-marker handling
         self.yolo_action_counter = 0  # Counter for YOLO detection interval
+        self.last_yolo_command = 'right'  # Store last YOLO command for continuity
         
         # ArUco Detection Buffer (5 frames)
         self.aruco_history = {}  # {marker_id: [list of last 5 detections]}
@@ -181,7 +182,7 @@ class HybridEvaluator:
 
     def detect_yolo(self, img):
         if not self.model_ready: return []
-        results = self.model(img, conf=0.5, verbose=False)
+        results = self.model(img, conf=0.7, verbose=False)
         detections = []
         for result in results:
             for box in result.boxes:
@@ -250,7 +251,7 @@ class HybridEvaluator:
         yolo_dets = []  
         if self.state == 'YOLO_TRACKING' and self.model_ready:
               self.yolo_action_counter += 1
-              if self.yolo_action_counter >= 3:
+              if self.yolo_action_counter >= 2:
                   yolo_dets = self.detect_yolo(img)  # 3프레임째만 실행
                   self.yolo_action_counter = 0
             
@@ -423,7 +424,7 @@ class HybridEvaluator:
             if not self.model_ready:
                 print("Waiting for YOLO...")
                 command = 'stop'
-            elif yolo_dets: # 3프레임째
+            elif yolo_dets:  # 2프레임째 - YOLO 결과 있음
                 found = next((d for d in yolo_dets if d['class'] == self.target_class), None)
                 if found:
                     cx = found['center'][0]
@@ -433,13 +434,14 @@ class HybridEvaluator:
                         command = 'left' if (cx < center_x) else 'right'
                     else:
                         command = 'forward'
+                    self.last_yolo_command = command  # Save for next frame
                 else:
                      print(f"[STATE] YOLO Target {self.target_class} Not Found. Scanning...")
                      command = 'right'
-            else: # 1~2 프레임째
-                # Non-YOLO action: Just move forward blindly or maintain last command
-                print(f"[STATE] YOLO_TRACKING (Action {self.yolo_action_counter}/3). Moving forward.")
-                command = 'forward' # Default scan?
+                     self.last_yolo_command = command
+            else:  # 1프레임째 - YOLO 안 돌림, 이전 명령 유지
+                print(f"[STATE] YOLO_TRACKING (Non-YOLO frame). Using last command: {self.last_yolo_command}")
+                command = self.last_yolo_command
 
         return img, all_dets, command, self.state, target_info
 

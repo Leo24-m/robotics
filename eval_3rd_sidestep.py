@@ -103,7 +103,7 @@ class HybridEvaluator:
         
         # ArUco Detection Buffer (5 frames)
         self.aruco_history = {}  # {marker_id: [list of last 5 detections]}
-        self.ARUCO_BUFFER_SIZE = 2
+        self.ARUCO_BUFFER_SIZE = 4
         
         # Performance
         self.last_frame_time = time.time()

@@ -360,7 +360,7 @@ class HybridEvaluator:
             
             if new_candidates:
                 target = min(new_candidates, key=lambda x: x['distance'])
-                if target['distance'] < 2.0:  # Changed from 3.0 to 2.0
+                if target['distance'] < 2.5:  # Changed from 3.0 to 2.0
                     self.buffered_id = target['id']
                     self.state = 'APPROACHING'
                     print(f"[STATE] Found NEW ID {self.buffered_id}. APPROACHING.")

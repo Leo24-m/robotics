@@ -33,8 +33,8 @@ MARKER_LENGTH = 0.0268       # meters
 YOLO_MODEL_PATH = "yolov8n.pt"
 
 # Navigation Params
-FOV_MARGIN = 320           # Center locking margin
-CENTER_THRESHOLD = 160      # Forward alignment
+FOV_MARGIN = 160           # Center locking margin
+CENTER_THRESHOLD = 80      # Forward alignment
 APPROACH_STOP_DIST = 0.60  # Stop ArUco approach at 60cm
 M9_CHECK_DIST = 1.00       # Distance to stop and center for M9 (approx 1m)
 TURN_WAIT_TIME = 2.0       
@@ -69,13 +69,11 @@ class HybridEvaluator:
         # RealSense
         self.pipeline = rs.pipeline()
         self.config = rs.config()
-        # self.config.enable_stream(rs.stream.color, 640, 480, rs.format.bgr8, 30)
-        # self.config.enable_stream(rs.stream.depth, 640, 480, rs.format.z16, 30)
-        self.config.enable_stream(rs.stream.color, 1280, 720, rs.format.bgr8, 30)
-        self.config.enable_stream(rs.stream.depth, 1280, 720, rs.format.z16, 30)
+        self.config.enable_stream(rs.stream.color, 640, 480, rs.format.bgr8, 30)
+        self.config.enable_stream(rs.stream.depth, 640, 480, rs.format.z16, 30)
         self.align = rs.align(rs.stream.color)
-        self.frame_width = 1280
-        self.frame_height = 720
+        self.frame_width = 640
+        self.frame_height = 480
         
         # Intrinsics
         self.camera_matrix = None
@@ -103,7 +101,7 @@ class HybridEvaluator:
         
         # ArUco Detection Buffer (5 frames)
         self.aruco_history = {}  # {marker_id: [list of last 5 detections]}
-        self.ARUCO_BUFFER_SIZE = 4
+        self.ARUCO_BUFFER_SIZE = 2
         
         # Performance
         self.last_frame_time = time.time()
@@ -489,6 +487,12 @@ def main():
 
     evaluator = HybridEvaluator(t_class)
     if not evaluator.start(): sys.exit(1)
+    
+    # Wait for YOLO model to load
+    print("Waiting for YOLO model to load...")
+    while not evaluator.model_ready:
+        time.sleep(0.1)
+    print(">>> YOLO Ready! Starting navigation. <<<")
     
     print("Starting Loop. 'q'=quit, 's'=toggle robot.")
     robot_active = True
